@@ -68,7 +68,7 @@ public:
     Stage * getEliteStage(int chapter_id,int stage_id);
     Stage * getSpecialStage(int chapter_id,int stage_id);
     //TODO
-    Stage*  getTrialStage(int stage_id);
+    Stage*  getTrialStage(int chapter_id, int stage_id);
     
     log4cxx::LoggerPtr logger_;
     string server_config_;
@@ -101,10 +101,8 @@ public:
     vector< vector<Stage> > elite_stages_;
     map<int , vector<Stage> > special_stages_;
     //TODO
-    vector <Stage> trial_stages_;
-    int  trial_daily_reset_limit_;
-    long long trail_instant_interval_; //unit: s
-
+    map <int, vector <Stage> > trial_stages_;
+    
     
     //system
     int fresh_interval_;
@@ -202,6 +200,9 @@ public:
     int expand_friend_limit_;
     int cost_per_expand_friend_;
     int place_per_expand_friend_;
+    int trial_times_per_day_;
+    int trial_time_per_stage_;
+    int trial_rank_num_;
     
     vector<StageReward> summon_items_;
     vector<double> summon_pby_;

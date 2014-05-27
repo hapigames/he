@@ -40,6 +40,8 @@ string buildChangeSoldierResponse(User * user);
 string buildCreateUserResponse();
 string buildLoadAssistantResponse(User * user,vector<User *> &assistants,int friend_index,vector<Hero *> &heroes);
 string buildBattleStartResponse(User * user);
+string buildUserRewardsContent(User *user);
+int    parseUserRewardsContent(vector <StageReward>& strewards, const string &contents);
 string buildBattleEndResponse(User * user,vector<Mission *> &mv);
 string buildFriendRequestResponse();
 string buildSellHeroResponse(User * user);

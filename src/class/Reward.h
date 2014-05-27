@@ -36,6 +36,7 @@ public:
 class StageReward
 {
 public:
+    StageReward(int t, int st, int p1, int p2):type(t),subtype(st),param_1(p1),param_2(p2) {}
     StageReward();
     ~StageReward();
     

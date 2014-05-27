@@ -37,7 +37,11 @@ DataHandler::DataHandler(int server_id)
     
     log4cxx::PropertyConfigurator::configure("log4cxx.config");
     logger_ = log4cxx::Logger::getLogger("DataHandler");
+
+    trial_rank_need_save_ = false;
+    trial_rank_last_save_time_ = 0;
 }
+
 DataHandler::~DataHandler()
 {
     mysql_close(&mysql_);
@@ -45,6 +49,8 @@ DataHandler::~DataHandler()
 }
 bool DataHandler::dhInitMysql()
 {
+    loadTrialRank();
+
     sconfig * sc = game_config.getSconfig(server_id_);
     if(sc == NULL) return false;
     mysql_init(&mysql_);
@@ -288,6 +294,13 @@ User * DataHandler::readUser(MYSQL_ROW &row)
         if(check == false) break;
         check = safeAtoll(row[27], user->team_id_);
         if(check == false) break;
+        check = safeAtoi(row[28], user->trial_stage_id_);
+        if (check == false) break;
+        check = safeAtoi(row[29], user->trial_max_stage_id_);
+        if (check == false) break;
+        check = safeAtoi(row[30], user->trial_daily_reset_);
+        if (check == false) break;
+        check = safeAtoll(row[31], user->trial_instant_start_time_);
         break;
     }
     
@@ -640,6 +653,9 @@ bool DataHandler::loadMail(MYSQL_ROW &row, int mnf, User *user)
         check = safeAtoi(row[6], mail->acceptable_);
         if(check == false) break;
         mail->title_ = row[7];
+        check = safeAtoi(row[8], mail->count);
+        if (check == false) break;
+        mail->contents = row[9];
         break;
     }
     if(check == false){
@@ -1108,6 +1124,22 @@ bool DataHandler::saveUserSInfo(User *user)
         return false;
     }
 }
+
+bool DataHandler::saveUserTrialInfo(User *user) {
+    char sql[1024] = {0};
+    snprintf(sql, 1024, "update user_info set `trial_stage_id`='%d', `trial_max_stage_id`='%d', `trial_daily_reset`='%d' , `trial_instant_start`='%lld' where `user_id`='%lld';", 
+           user->trial_stage_id_, user->trial_max_stage_id_, user->trial_daily_reset_, user->trial_instant_start_time_, user->uid_);
+    int ret = mysql_query(&mysql_, sql);
+    if (ret == 0) {
+        user->dirty_ = false;
+        return true;
+    }
+    else {
+        db_error_ = ret;
+        return false;
+    }
+}
+
 bool DataHandler::saveHero(Hero * hero)
 {
     db_error_ = 0;
@@ -1448,21 +1480,23 @@ bool DataHandler::addItem(User *user, int type, int mid, int amount, long long n
         }
     }
 }
-bool DataHandler::addNewMail(User * tuser,uid_type fuid,string &title,string &text,int acceptable)
+bool DataHandler::addNewMail(User * tuser,uid_type fuid,string &title,string &text,int acceptable, int amount, string &contents)
 {
     long long mail_id = 0;
     long long now = time(NULL);
     int count = 0;
-    char sql[1024] = {0};
-    count = snprintf(sql,1024,"%s%lld%s%lld%s%lld%s%s%s%d%s%d%s%s%s","insert into mail_info(owner_id,sender_id,send_time,mail_text,have_read,acceptable,title) values ("
-                     ,tuser->uid_,\
-                     ",",fuid,\
-                     ",",now,\
-                     ",\"",text.c_str(),\
-                     "\",",MAIL_NOT_READ,\
-                     ",",acceptable,\
-                     ",\"",title.c_str(),\
-                     "\");");
+    char sql[2048] = {0};
+    count = snprintf(sql,2048,"%s%lld%s%lld%s%lld%s%s%s%d%s%d%s%s%s%d%s%s%s","insert into mail_info(owner_id,sender_id,send_time,mail_text,have_read,acceptable,title,`count`,`contents`) values (",
+                     tuser->uid_,
+                     ",",fuid,
+                     ",",now,
+                     ",'",text.c_str(),
+                     "',",MAIL_NOT_READ,
+                     ",",acceptable,
+                     ",'",title.c_str(),\
+                     "',", amount,\
+                     ",'", contents.c_str(),\
+                     "');");
     int ret = mysql_query(&mysql_, sql);
     if(ret == 0){
         mail_id = mysql_insert_id(&mysql_);
@@ -1480,6 +1514,8 @@ bool DataHandler::addNewMail(User * tuser,uid_type fuid,string &title,string &te
     mail->send_time_ = now;
     mail->haveread_ = MAIL_NOT_READ;
     mail->acceptable_ = acceptable;
+    mail->count = amount;
+    mail->contents = contents;
     tuser->mails_.insert(make_pair(mail_id, mail));
     return true;
 }
@@ -1822,3 +1858,110 @@ bool DataHandler::createFakeUser()
     }
     return true;
 }
+
+
+void DataHandler::updateTrialRank(long long uid, int data, long long now) {
+    int in_rank = 0;
+    for (size_t i = 0; i < trial_ranks_.size(); i++) {
+        if (trial_ranks_[i].uid == uid) {
+            in_rank = 1;
+            trial_ranks_[i].data = data;
+            trial_ranks_[i].time = now;
+            trial_rank_need_save_ = true;
+        }
+    }
+    if (in_rank == 0) {
+        if ((int)trial_ranks_.size() >= game_config.trial_rank_num_) {
+            int last = (int) trial_ranks_.size()-1;
+            if (data > trial_ranks_[last].data) {
+                trial_ranks_[last].data = data;
+                trial_ranks_[last].time = now;
+                trial_ranks_[last].uid = uid;
+                trial_rank_need_save_ = true;
+            }
+        }
+        else {
+            trial_ranks_.push_back(RankItem(uid, now, data));
+            trial_rank_need_save_ = true;
+        }
+    }
+
+    if (trial_rank_need_save_) {
+        sort(trial_ranks_.begin(), trial_ranks_.end(), greater<RankItem>());
+    }
+
+    //save file
+    saveTrialRank();
+}
+
+void DataHandler::saveTrialRank() {
+
+    long long now = time(NULL);
+
+    if (trial_rank_need_save_ == false && now - trial_rank_last_save_time_ < 30) {//TODO config
+        return ;
+    }
+    trial_rank_need_save_ = false;
+    trial_rank_last_save_time_ = now;
+    
+    //TODO 配置排行版存储路径
+    const char *fileprefix="trialrank_";
+    char file[512];
+    snprintf(file, 512, "%s%d.dat", fileprefix, server_id_);
+
+    int succ = 0;
+    FILE *fp = fopen(file, "wb");
+    if (fp) {
+        int size = (int)trial_ranks_.size();
+        if (saveint(size, fp)) {
+            for (size_t i = 0; i < trial_ranks_.size(); i++) {
+                savelonglong(trial_ranks_[i].uid, fp);
+                savelonglong(trial_ranks_[i].time, fp);
+                saveint(trial_ranks_[i].data, fp);
+            }
+        }
+        else {
+            succ = 1;
+        }
+
+        fclose(fp);
+    }
+    else {
+        succ = 1000;
+    }
+    LOG4CXX_WARN(logger_, "saveTrialRank to "<<file<<", succ:"<<succ);        
+}
+
+void DataHandler::loadTrialRank() {
+    const char *fileprefix="trialrank_";
+    char file[512];
+    snprintf(file, 512, "%s%d.dat", fileprefix, server_id_);
+
+    int succ = 0;
+    FILE *fp = fopen(file, "rb");
+    if (fp) {
+        int size = 0;
+        if (loadint(size, fp)) {
+            for (int i = 0; i < size; i++) {
+                RankItem rkitem;
+                loadlonglong(rkitem.uid, fp);
+                loadlonglong(rkitem.time, fp);
+                loadint(rkitem.data, fp);
+                trial_ranks_.push_back(rkitem);
+            }
+        }
+        else {
+            succ = 1;
+        }
+
+        sort(trial_ranks_.begin(), trial_ranks_.end(), greater<RankItem>());
+
+        fclose(fp);
+        LOG4CXX_WARN(logger_, "loadTrialRank from "<<file<<", succ:"<<succ);
+    }
+    else {
+        LOG4CXX_WARN(logger_, "loadTrialRank from "<<file<<", failed[if first load ]");
+    }
+}
+
+

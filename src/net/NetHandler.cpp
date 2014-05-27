@@ -170,6 +170,14 @@ bool NetHandler::sendString(int fd,string &s)
     return cache->write();
 }
 
+bool NetHandler::sendString(int fd, const char *str, size_t len) {
+    LOG4CXX_DEBUG(logger_, "sendString:"<<str);
+    ConnectionCache *cache = getConnectionByFd(fd);
+    if (cache == NULL) return false;
+    if (cache->prepareToWrite(str, len) == false) return false;
+    return cache->write();
+}
+
 void NetHandler::showStatus()
 {
     //cout<<"########################"<<endl;

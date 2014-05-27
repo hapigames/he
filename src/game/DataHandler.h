@@ -20,6 +20,7 @@
 #include "../common/GameConfig.h"
 #include "../class/Payment.h"
 #include "../class/Act.h"
+#include "../class/RankItem.h"
 #include <map>
 #include <queue>
 #include <vector>
@@ -84,6 +85,7 @@ public:
 
     bool saveUser(User * user);
     bool saveUserSInfo(User * user);
+    bool saveUserTrialInfo(User *user);
     bool saveHero(Hero * hero);
     bool saveSoldier(Soldier * soldier);
     bool saveItem(Item * item);
@@ -103,7 +105,7 @@ public:
     bool addItem(User * user,int type,int mid,int amount,long long now);
     bool addFriendRequest(User * user,uid_type tuid,uid_type fuid);
     bool addFriend(User * user,User * tuser);
-    bool addNewMail(User * tuser,uid_type fuid,string &title,string &text,int acceptable);
+    bool addNewMail(User * tuser,uid_type fuid,string &title,string &text,int acceptable, int amount, string &contents);
     bool addNewMission(User * user,int type,int subtype,int record,int complete);
     bool addNewStageRecord(User * user,int chapter_id,int stage_id);
     bool addNewPayment(PaymentInfo * pi);
@@ -120,6 +122,10 @@ public:
     bool deleteMission(long long mission_id);
     
     void addNews(string &name,int action,int param_1,int param_2,int param_3);
+
+    void updateTrialRank(long long uid, int data, long long now);
+    void saveTrialRank();
+    void loadTrialRank();
     
     map<uid_type,User*> users_;
     MYSQL mysql_;
@@ -135,9 +141,15 @@ public:
     int news_pointer_;
     int global_news_index_;
     int server_id_;
-    
+
+    //TODO trial rank  
+    vector <RankItem> trial_ranks_;
+    bool trial_rank_need_save_;
+    long long trial_rank_last_save_time_;
+
     log4cxx::LoggerPtr logger_;
     
 };
 
 #endif
+

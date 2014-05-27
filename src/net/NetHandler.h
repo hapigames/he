@@ -43,6 +43,7 @@ public:
     void removeConnection(int fd);
     void closeConnection(int fd);
     bool sendString(int fd,string &s);
+    bool sendString(int fd, const char *str, size_t len);
     void showStatus();
     void cleanZombieConnection(long long time);
     

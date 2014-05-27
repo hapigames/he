@@ -130,6 +130,8 @@ public:
     void processInstantTrial(EventCmd &e, vector <string> &cmd);
     void processTrialProgress(EventCmd &e, vector <string> &cmd);
     void processGetTrialRank(EventCmd &e, vector <string> &cmd);
+    void processResetTrialStage(EventCmd &e, vector <string> &cmd);
+    void processTrialRelive(EventCmd &e, vector <string> &check_cmd);
     
     void sendErrorResponse(int fd,int cmd_code,int error_code);
     void sendErrorResponseFroPayment(int fd,int cmd_code,int error_code,string &tran_id);
@@ -182,9 +184,13 @@ public:
     bool specialDailyCheck(User * user,int chapter_id, int stage_id,int times);
     bool setSpecialDaily(User * user,int chapter_id,int stage_id);
     bool resetEliteDaily(User * user, int type, int chapter_id, int stage_id);
+    bool setTrialDaily(User *user, int chapter_id, int stage_id);
+    void trialDailyCheck(User *user, int chapter_id);
     bool specialTimeCheck(User * user,Stage * stage,long long now);
     bool dateChange(long long now ,long long comp);
     int getSpecialChaptertoSave(int chapter_id);
+    int getTrialChaptertoSave(int chapter_id);
+    int getChaptertoSaveKey(int type, int chapter_id);
     Team * inTeamHero(User * user,long long hero_id);
     Team * inTeamSoldier(User *user, long long solider_id);
     void modifyBattlereward(vector<StageReward *> &rewards,int limit);

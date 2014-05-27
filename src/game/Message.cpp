@@ -189,6 +189,44 @@ string buildBattleStartResponse(User * user)
     }
     return ost.str();
 }
+
+string buildUserRewardsContent(User *user) {
+    ostringstream ost;
+    ost<<user->rewards_.size()<<";";
+    for (size_t i = 0; i < user->rewards_.size(); i++) {
+        StageReward *sr = user->rewards_[i];
+        if (sr == NULL) continue;
+        ost<<sr->type<<","<<sr->subtype<<","<<sr->param_1<<","<<sr->param_2<<";";
+    }
+    return ost.str();
+}
+
+int parseUserRewardsContent(vector <StageReward>& strewards, const string &contents) {
+
+    strewards.clear();
+
+    int ret = 0;
+    vector <string> tokens;
+    string delims=";";
+    tokenize(contents,tokens, delims);
+    if (tokens.size() > 0 && safeAtoi(tokens[0], ret)) {
+        strewards.resize(ret);    
+        delims = ",";
+        for (size_t i = 1; i < tokens.size(); i++) {
+            vector <int> subitems;
+            numtokenize(tokens[i], subitems, delims); 
+            if (subitems.size() == 4) {
+                strewards[i-1].type = subitems[0];
+                strewards[i-1].subtype = subitems[1];
+                strewards[i-1].param_1 = subitems[2];
+                strewards[i-1].param_2 = subitems[3];
+            }
+        }
+    }
+    return ret;
+}
+
+
 string buildBattleEndResponse(User * user,vector<Mission *> &mv)
 {
     ostringstream ost;
@@ -230,6 +268,16 @@ string buildResetEliteStageResponse(User* user) {
     ost<<cmd_list[CMD_RESET_ELITE_STAGE]<<";0;"<<user->diamond_;
     return ost.str();
 }
+/*
+string buildInstantTrialResponse(long long now, User *user) {
+    ostringstream ost;
+    long long timeleft = game_config.trial_instant_interval_ - (now - user->trial_instant_start_time_);
+    timeleft = max(timeleft, 0);
+    ost<<cmd_list[CMD_INSTANT_TRIAL]<<";0;"<<timeleft;
+    return ost.str();
+}
+*/
+
 string buildFriendRequestResponse()
 {
     ostringstream ost;
@@ -402,9 +450,10 @@ string buildLoadMailResponse(User * user,vector<Mail *> &mtmp,vector<User * > &u
 string buildOpenMailResponse(Mail * mail)
 {
     ostringstream ost;
-    ost<<cmd_list[CMD_OPENMAIL]<<";0;"<<mail->mail_id_<<";"<<mail->sender_id_<<";"<<mail->text_;
+    ost<<cmd_list[CMD_OPENMAIL]<<";0;"<<mail->mail_id_<<";"<<mail->sender_id_<<";"<<mail->text_<<";"<<mail->contents<<";";
     return ost.str();
 }
+
 string buildDeleteMailResponse(long long mail_id)
 {
     ostringstream ost;

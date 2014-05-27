@@ -51,6 +51,8 @@ public:
     int acceptable_;
     string text_;
     string title_;
+    int count;
+    string contents;
     
 };
 

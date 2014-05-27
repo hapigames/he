@@ -105,6 +105,9 @@ bool GameConfig::loadFromFile()
         normal_stage_exp_rate_ = sys_config["normal_stage_exp_rate"];
         elite_stage_exp_rate_ = sys_config["elite_stage_exp_rate"];
         elite_stage_reset_cost_ = sys_config["elite_stage_reset_cost"];
+        trial_rank_num_ = sys_config["trial_rank_num"];
+        trial_times_per_day_ = sys_config["trial_times_per_day"];
+        trial_time_per_stage_ = sys_config["trial_time_per_stage"];
         
         time_area_fix_ = 1391270400LL;
         energy_price_.clear();
@@ -321,6 +324,41 @@ bool GameConfig::loadFromFile()
             readStageReward(sr, stage_config["special_stage_reward"][i]["reward"]);
             (it->second)[stage_id].rewards_.push_back(sr);
         }
+
+        //TODO
+        trial_stages_.clear();
+        const Setting &tscfg = stage_config["trial_stage_info"];
+        for (int i = 0; i < tscfg.getLength(); i++) {
+            Stage stage;
+            stage.chapter_id_ = tscfg[i]["chapter_id"];
+            if (trial_stages_.find(stage.chapter_id_) == trial_stages_.end()) {
+                trial_stages_.insert(make_pair<int,vector<Stage> >(stage.chapter_id_, vector<Stage>()));
+            }
+            stage.stage_id_ = tscfg[i]["stage_id"];
+            stage.reward_gold_ = tscfg[i]["reward_gold"];
+            map <int, vector <Stage> >::iterator iter = trial_stages_.find(stage.chapter_id_);
+            if ((int) iter->second.size() <= stage.stage_id_) {
+                iter->second.resize(stage.stage_id_+1);
+            }
+            iter->second[stage.stage_id_] = stage;
+        }
+        const Setting &tsreward = stage_config["trial_stage_reward"];
+        for (int i = 0; i < tsreward.getLength(); i++) {
+            int chid = tsreward[i]["chapter"];
+            int stid = tsreward[i]["stage"];
+	    LOG4CXX_INFO(logger_, "trial reward: " << chid << "  "<<stid);
+            map <int, vector <Stage> >::iterator iter = trial_stages_.find(chid);
+            if (iter == trial_stages_.end()) {
+                return false;
+            }
+            if (stid <= 0 || stid >= (int) iter->second.size()) {
+                return false;
+            }
+            StageReward sr;
+            readStageReward(sr, tsreward[i]["reward"]);
+            iter->second[stid].rewards_.push_back(sr);
+        }
+
         //hero
         Setting &hero_config = st["hero"];
         for(int i = 0;i<hero_config["hero_info"].getLength();i++){
@@ -675,7 +713,7 @@ Stage * GameConfig::getStage(int type, int chapter_id, int stage_id)
     if(type == STAGE_TYPE_NORMAL) return getNormalStage(chapter_id, stage_id);
     else if(type == STAGE_TYPE_ELITE) return getEliteStage(chapter_id, stage_id);
     else if(type == STAGE_TYPE_SPECIAL) return getSpecialStage(chapter_id, stage_id);
-    else if (type == STAGE_TYPE_TRIAL) return getTrialStage(stage_id);
+    else if (type == STAGE_TYPE_TRIAL) return getTrialStage(chapter_id, stage_id);
     return NULL;
 }
 Stage * GameConfig::getNormalStage(int chapter_id, int stage_id)
@@ -707,11 +745,18 @@ Stage * GameConfig::getSpecialStage(int chapter_id, int stage_id)
     return &(it->second)[stage_id];
 }
 
-Stage * GameConfig::getTrialStage(int stage_id) {
-    if (stage_id <= 0 || stage_id >= (int) trial_stages_.size()) {
+Stage * GameConfig::getTrialStage(int chapter_id, int stage_id) {
+    if (stage_id <= 0 || chapter_id <= 0) {
         return NULL;
     }
-    return &trial_stages_[stage_id];
+    map <int, vector <Stage> >::iterator iter = trial_stages_.find(chapter_id);
+    if (iter == trial_stages_.end()) {
+        return NULL;
+    }
+    if (stage_id >= (int) iter->second.size()) {
+        return NULL;
+    }
+    return &((iter->second)[stage_id]);
 }
 
 int GameConfig::getValueFromIntVectorFilledZero(int index, vector<int> &v)

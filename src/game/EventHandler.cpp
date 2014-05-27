@@ -282,6 +282,12 @@ void EventHandler::handle(EventCmd &event)
         case CMD_GET_TRIAL_RANK:
             processGetTrialRank(event, check_cmd);
             break;
+        case CMD_TRIAL_RESET:
+            processResetTrialStage(event, check_cmd);
+            break;
+        case CMD_TRIAL_RELIVE:
+            processTrialRelive(event, check_cmd);
+            break;
         default:
             break;
     }
@@ -661,10 +667,6 @@ void EventHandler::processBattleStart(EventCmd &e, vector<string> &check_cmd)
     }else if(type == STAGE_TYPE_SPECIAL){
         modifyBattlereward(user->rewards_, game_config.special_stage_reward_limit_);
     }
-    else if (type == STAGE_TYPE_TRIAL) {
-        //TODO
-        //modifyBattlereward(user->rewards_, game_config.trial_stage_reward_limit_);
-    }
 
     LOG4CXX_INFO(logger_, "battlestart;"<<uid<<";"<<assistant_uid<<";"<<type<<";"<<chapter_id<<";"<<stage_id);
     string res = buildBattleStartResponse(user);
@@ -733,9 +735,12 @@ void EventHandler::processBattleEnd(EventCmd &e, vector<string> &check_cmd)
     if(assistant!= NULL){
         LOG4CXX_INFO(logger_, "battlespark;"<<assistant->uid_<<";"<<assistant->spark_num_<<";"<<assistant->spark_daily_num_);
     }
-    costEnergyForBattle(user, stage);
+    if (user->stage_type_ != STAGE_TYPE_TRIAL) {
+        costEnergyForBattle(user, stage);
+    }
     addBasicBattleReward(user, stage,user->stage_type_);
     setStageInfo(user);
+
     if(user->stage_type_ == STAGE_TYPE_ELITE){
         check = setEliteDaily(user, user->battle_chapter_id_, user->battle_stage_id_);
         if(check == false){
@@ -743,13 +748,22 @@ void EventHandler::processBattleEnd(EventCmd &e, vector<string> &check_cmd)
             return;
         }
     }
-    if(user->stage_type_ == STAGE_TYPE_SPECIAL){
+    else if(user->stage_type_ == STAGE_TYPE_SPECIAL){
         check = setSpecialDaily(user, user->battle_chapter_id_, user->battle_stage_id_);
         if(check == false){
             sendErrorResponse(e.fd_, CMD_BATTLEEND, ERROR_SYSTEM_CRITICAL_ERROR);
             return;
         }
     }
+    else if (user->stage_type_ == STAGE_TYPE_TRIAL) {
+        //TODO
+        check = setTrialDaily(user, user->battle_chapter_id_, user->battle_stage_id_);
+        if (check == false) {
+            sendErrorResponse(e.fd_, CMD_BATTLEEND, ERROR_SYSTEM_CRITICAL_ERROR);
+            return;
+        }
+    }
+    
     long long now = time(NULL);
     for(size_t i = 0;i<user->rewards_.size();i++){
         if(addStageReward(user, user->rewards_[i], now) == false){
@@ -2391,7 +2405,8 @@ void EventHandler::processSendMail(EventCmd &e, vector<string> &check_cmd)
         }
         tuser->mails_.erase(mail_id);
     }
-    check = dh_->addNewMail(tuser, uid, user->nick_name_, check_cmd[4], MAIL_NO_ITEM);
+    string str="";
+    check = dh_->addNewMail(tuser, uid, user->nick_name_, check_cmd[4], MAIL_NO_ITEM, 0, str);
     if(check == false) return;
     string res = buildSendMailResponse();
     nh_->sendString(e.fd_, res);
@@ -2442,6 +2457,16 @@ void EventHandler::processAcceptMailItem(EventCmd &e, vector<string> &check_cmd)
             return;
         }
     }
+    if (mail->contents.size() > 1) {
+        vector <StageReward> strewards;
+        parseUserRewardsContent(strewards, mail->contents);
+        for (size_t i = 0; i < strewards.size(); i++) {
+            if (addStageReward(user, &strewards[i], now) == false) {
+                //LOG
+            }
+        }
+    }
+
     mail->acceptable_ = MAIL_ITEM_ACCEPTED;
     check = dh_->saveMail(mail);
     if(check == false || dh_->db_error_ != 0){
@@ -3570,28 +3595,31 @@ void EventHandler::processResetEliteStage(EventCmd &e, vector<string> &check_cmd
     int chapter_id;
     int stage_id;
     int cost;
-    bool check = safeAtoll(check_cmd[1], uid);
-    if(check == false) return;
-    check = safeAtoi(check_cmd[3], type);
-    if (check == false) return;
-    check = safeAtoi(check_cmd[4], chapter_id);
-    if(check == false) return;
-    check = safeAtoi(check_cmd[5], stage_id);
-    if(check == false) return;
+
+    if (!safeAtoll(check_cmd[1], uid)
+            || !safeAtoi(check_cmd[3], type)
+            || !safeAtoi(check_cmd[4], chapter_id)
+            || !safeAtoi(check_cmd[5], stage_id)) {
+        return ;
+    }
+
     User * user = safeGetUser(uid, CMD_RESET_ELITE_STAGE, e.fd_, check_cmd[2]);
     if(user == NULL) return;
+
     if (type == STAGE_TYPE_SPECIAL) {
         Stage* stage = game_config.getStage(type, chapter_id, stage_id);
         cost = stage->reset_cost_;
-    } else {
+    }
+    else {
         cost = game_config.elite_stage_reset_cost_;
     }
+
     if (cost > user->diamond_) {
         sendErrorResponse(e.fd_, CMD_RESET_ELITE_STAGE, ERROR_CANNOT_PAY_COST);
         return;
     }
     user->diamond_ -= cost;
-    check = dh_->saveUser(user);
+    bool check = dh_->saveUser(user);
     if(check == false){
         sendErrorResponse(e.fd_, CMD_RESET_ELITE_STAGE, ERROR_SYSTEM_CRITICAL_ERROR);
         return;
@@ -3605,6 +3633,252 @@ void EventHandler::processResetEliteStage(EventCmd &e, vector<string> &check_cmd
     nh_->sendString(e.fd_, res);
     dh_->updateFresh(user);
 }
+
+void EventHandler::processInstantTrial(EventCmd &e, vector<string> &check_cmd) {
+    uid_type uid;
+    int stage_id;
+    if (check_cmd.size() != 4
+            || !safeAtoll(check_cmd[1], uid)
+            || !safeAtoi(check_cmd[3], stage_id)) {
+        return;
+    }
+    string &eqid = check_cmd[2];
+
+    User *user = safeGetUser(uid, CMD_INSTANT_TRIAL, e.fd_, eqid);
+    if (user == NULL) return;
+    int succ = 0;
+    long long timeleft = 0;
+    if (user->trial_instant_start_time_ > 0) {
+        succ = ERROR_TRIAL_INSTANTING;
+    }
+    else if (user->trial_stage_id_ > user->trial_max_stage_id_) {
+        succ = ERROR_TRIAL_NO_INSTANT;
+    }
+    else {
+        long long now = time(NULL);
+
+        long long need_time = (user->trial_max_stage_id_ - user->trial_stage_id_ + 1) * game_config.trial_time_per_stage_;
+    
+        user->trial_instant_start_time_ = now;
+
+        timeleft = need_time - (now - user->trial_instant_start_time_);;
+    
+        dh_->saveUserTrialInfo(user);
+    }
+
+    ostringstream ost;
+    ost<<cmd_list[CMD_INSTANT_TRIAL]<<";"<<succ<<";"<<timeleft;
+    nh_->sendString(e.fd_, ost.str().c_str(), ost.str().size());
+    dh_->updateFresh(user);
+
+}
+
+void EventHandler::processTrialProgress(EventCmd &e, vector<string> &check_cmd) {
+    uid_type uid;
+    if (check_cmd.size() != 3
+            || !safeAtoll(check_cmd[1], uid)) {
+        return;
+    }
+    string &eqid = check_cmd[2];
+    User *user = safeGetUser(uid, CMD_TRIAL_PROGRESS, e.fd_, eqid);
+    if (user == NULL) {
+        return;
+    }
+    safeLoadStageRecord(user, CMD_TRIAL_PROGRESS, e.fd_);
+    
+    trialDailyCheck(user, 1);
+
+    int succ = 0;
+    long long timeleft = 0;
+
+    if (user->trial_instant_start_time_ > 0) {
+
+        long long now = time(NULL);
+        long long need_time = (user->trial_max_stage_id_ - user->trial_stage_id_ + 1) * game_config.trial_time_per_stage_;
+        timeleft = need_time - (now - user->trial_instant_start_time_);
+        timeleft = max(timeleft, 0);
+
+        if (timeleft == 0) {
+            //TODO 1
+            int srkey = getTrialChaptertoSave(1);
+            map <int, StageRecord *>::iterator iter = user->stage_record_.find(srkey);
+            if (iter == user->stage_record_.end()) {
+                //以防数据库出错
+                if (dh_->addNewStageRecord(user, srkey, user->trial_stage_id_)) {
+                    iter = user->stage_record_.find(srkey);
+                }
+            }
+            if (iter != user->stage_record_.end()) {
+                StageRecord *sr = iter->second;
+                if ((int) sr->record_.size() <= user->trial_max_stage_id_) {
+                    sr->record_.resize(user->trial_max_stage_id_ + 1, 1);
+                }
+                for (size_t i = 1; i< sr->record_.size(); i++) {
+                    sr->record_[i] = 1;
+                }
+                succ = 0;  
+
+                vector<StageReward> streward;
+
+                for (int i = user->trial_stage_id_; i <= user->trial_max_stage_id_; i++) {
+                    Stage * stage = game_config.getTrialStage(1, i);
+                    if (stage == NULL) {
+                        continue;
+                    }
+                    for(size_t j = 0; j<stage->rewards_.size(); j++){
+                        int pby = rand()%PBY_PRECISION;
+                        if(pby<stage->rewards_[j].pby){
+                            user->rewards_.push_back(&(stage->rewards_[j]));
+                        }
+                    }
+                    streward.push_back(StageReward(ITEM_TYPE_GOLD, 0, stage->reward_gold_, 0));
+                }
+                for (size_t i = 0; i < streward.size(); i++) {
+                    user->rewards_.push_back(&(streward[i]));
+                }
+                string contents = buildUserRewardsContent(user);
+                //TODO log
+                string title="title";
+                string text= itoa(MAIL_TYPE_TRIAL_INSTANT);
+                //get mail text and title
+                MailConfig *mc = game_config.getMailConfig(MAIL_TYPE_TRIAL_INSTANT);
+                if (mc) {
+                    title = mc->title;
+                }
+                dh_->addNewMail(user, SYSTEM_MAIL_SENDER_ID, title, text, 1, (int)user->rewards_.size(), contents);
+
+                user->rewards_.clear();
+                user->trial_instant_start_time_ = 0;
+                user->trial_stage_id_ = user->trial_max_stage_id_ + 1;
+
+                if (!dh_->saveStageRecord(sr) || !dh_->saveUserTrialInfo(user)) {
+                    succ = ERROR_TRIAL_SAVE_STAGE_RECORD;
+                }
+            }
+            else {
+                succ = ERROR_SYSTEM_CRITICAL_ERROR;
+            }
+        }
+    }
+
+    ostringstream ost;
+    ost<<cmd_list[CMD_TRIAL_PROGRESS]<<";"<<succ<<";"<<user->trial_stage_id_<<";"<<user->trial_max_stage_id_<<";"<<timeleft<<";"<<(game_config.trial_times_per_day_ - user->trial_daily_reset_);
+    nh_->sendString(e.fd_, ost.str().c_str(), ost.str().size());
+    dh_->updateFresh(user);
+}
+
+void EventHandler::processGetTrialRank(EventCmd &e, vector<string> &check_cmd) {
+    uid_type uid;
+    if (check_cmd.size() != 3
+            || !safeAtoll(check_cmd[1], uid)){
+        return;
+    }
+    //string &eqid = check_cmd[2];
+    size_t num = dh_->trial_ranks_.size();
+    ostringstream ost;
+    ost<<cmd_list[CMD_GET_TRIAL_RANK]<<";0;"<<num<<";";
+    for (size_t i = 0; i < num; i++) {
+        long long uid = dh_->trial_ranks_[i].uid;
+        User *user = dh_->getUser(uid);
+        if (!user) {
+            continue;
+        }
+        safeLoadHero(user, CMD_GET_TRIAL_RANK, e.fd_);
+        map <long long, Hero *>::iterator iter = user->heroes_.find(user->hero_id_);
+        if (iter == user->heroes_.end()) {
+            continue;
+        }
+        Hero *hero = iter->second;
+        ost<<uid<<","<<user->nick_name_<<","<<user->user_level_<<","<<user->trial_max_stage_id_<<","<<dh_->trial_ranks_[i].time\
+            <<","<<hero->mid_<<","<<hero->level_<<","<<hero->star_<<";";
+    }
+    nh_->sendString(e.fd_, ost.str().c_str(), ost.str().size());
+}
+
+void EventHandler::processResetTrialStage(EventCmd &e, vector <string> &check_cmd) {
+    uid_type uid;
+    int chapter_id;
+    if (check_cmd.size() != 4
+            || !safeAtoll(check_cmd[1], uid)
+            || !safeAtoi(check_cmd[3], chapter_id)) {
+        return;
+    }
+    string &eqid = check_cmd[2];
+    User *user = safeGetUser(uid, CMD_TRIAL_RESET, e.fd_, eqid);
+    if (user == NULL) {
+        return;
+    }
+    safeLoadStageRecord(user, CMD_TRIAL_RESET, e.fd_);
+
+    //TODO can not reset when instant
+    //
+    long long now = time(NULL);
+    int srkey = getTrialChaptertoSave(chapter_id);
+    int succ = 0;
+
+    map<int, StageRecord *>::iterator it = user->stage_record_.find(srkey);
+    if(it != user->stage_record_.end()){
+
+        trialDailyCheck(user, chapter_id);
+
+        StageRecord *sr = it->second;
+
+        //trial daily limit
+        if (user->trial_daily_reset_ >= game_config.trial_times_per_day_) {
+            succ = ERROR_TRIAL_RESET_COUNT_ERROR;
+        }
+        else {
+            for (size_t i = 1; i < sr->record_.size(); i++) {
+                sr->record_[i] = 0;
+            }
+        }
+        user->trial_stage_id_ = 1;
+        user->trial_daily_reset_ ++;
+        dh_->saveUserTrialInfo(user);
+        sr->update_time_ = now;
+        dh_->saveStageRecord(sr);
+    }
+    else {
+        succ = ERROR_TRIAL_RESET_NO_RECORD;
+    }
+
+    ostringstream ost;
+    ost<<cmd_list[CMD_TRIAL_RESET]<<";"<<succ<<";"<<user->trial_stage_id_<<";"<<user->trial_max_stage_id_<<";"<<(game_config.trial_times_per_day_ - user->trial_daily_reset_);
+    nh_->sendString(e.fd_, ost.str().c_str(), ost.str().size());
+}
+
+void EventHandler::processTrialRelive(EventCmd &e, vector <string> &check_cmd) {
+    uid_type uid;
+    int chid;
+    int stid;
+    if (check_cmd.size() != 5
+            || !safeAtoll(check_cmd[1], uid)
+            || !safeAtoi(check_cmd[3], chid)
+            || !safeAtoi(check_cmd[4], stid)) {
+        return;
+    }
+    string &eqid = check_cmd[2];
+    User *user = safeGetUser(uid, CMD_TRIAL_RELIVE, e.fd_, eqid);
+    if (user == NULL) {
+        return;
+    }
+    int succ = 0;
+    if (chid != user->battle_chapter_id_ || stid != user->battle_stage_id_) {
+        succ = ERROR_TRIAL_RELIVE_STAGE_ERROR;
+    }
+    else if (user->diamond_ <= 0) {
+        succ = ERROR_TRIAL_RELIVE_DIAMOND_NOT_ENOUGH;
+    }
+    else {
+        user->diamond_ --;
+        //TODO log
+    }
+    ostringstream ost;
+    ost<<cmd_list[CMD_TRIAL_RELIVE]<<";"<<succ<<";"<<user->diamond_;
+    nh_->sendString(e.fd_, ost.str().c_str(), ost.str().size());
+}
+
+
 void EventHandler::sendErrorResponse(int fd, int cmd_code, int error_code)
 {
     if(error_code == ERROR_SYSTEM_CRITICAL_ERROR){
@@ -3708,7 +3982,7 @@ FriendRequestInfo * EventHandler::safeGetFriendRequestInfo(User *user, uid_type 
 Item * EventHandler::safeGetItem(User * user,int type,int mid)
 {
     for(map<long long,Item * >::iterator it = user->items_.begin();
-        it!=user->items_.end();it++){
+            it!=user->items_.end();it++){
         if(it->second->type_ == type && it->second->mid_ == mid){
             return it->second;
         }
@@ -3723,7 +3997,7 @@ Mail * EventHandler::safeGetMail(User * user,long long mail_id,int cmd_code,int 
         return NULL;
     }
     return it->second;
-    
+
 }
 Mission * EventHandler::safeGetMission(User * user, long long mission_id, int cmd_code, int fd)
 {
@@ -3840,7 +4114,7 @@ bool EventHandler::safeLoadTeam(User * user,int cmd_code,int fd)
         }
         if(user->teams_.size() == 1){
             for(map<long long ,Team*>::iterator it = user->teams_.begin();
-                it!= user->teams_.end();it++){
+                    it!= user->teams_.end();it++){
                 Team * team = it->second;
                 team->hero_id_ = user->hero_id_;
                 team->soldier_id_.clear();
@@ -3944,14 +4218,14 @@ Stage *  EventHandler::preCheckCanBattle(User *user, int type, int chapter_id, i
             }
         }else if(uchapter_id < chapter_id){
             if(chapter_id != uchapter_id + 1
-               || stage_id != 1
-               || (int) game_config.stages_[uchapter_id].size() - 1 > ustage_id){
+                    || stage_id != 1
+                    || (int) game_config.stages_[uchapter_id].size() - 1 > ustage_id){
                 sendErrorResponse(fd, cmd_code, ERROR_STAGE_LOCKED);
                 return NULL;
             }
             return stage;
         }
-        
+
     }else if(type == STAGE_TYPE_ELITE){
         stage = game_config.getEliteStage(chapter_id, stage_id);
         if(stage == NULL){
@@ -3962,7 +4236,7 @@ Stage *  EventHandler::preCheckCanBattle(User *user, int type, int chapter_id, i
             sendErrorResponse(fd, cmd_code, ERROR_GOT_LIMIT);
             return NULL;
         }
-        
+
         if(checkEnergy(user, stage->energy_required_, now) == false){
             sendErrorResponse(fd, cmd_code, ERROR_ENERGY_NOT_ENOUGH);
             return NULL;
@@ -3980,8 +4254,8 @@ Stage *  EventHandler::preCheckCanBattle(User *user, int type, int chapter_id, i
             }
         }else if(user->elite_chapter_id_ < chapter_id){
             if(chapter_id != user->elite_chapter_id_+1
-               || stage_id != 1
-               || (int) game_config.elite_stages_[user->elite_chapter_id_].size()-1 > user->elite_stage_id_){
+                    || stage_id != 1
+                    || (int) game_config.elite_stages_[user->elite_chapter_id_].size()-1 > user->elite_stage_id_){
                 check = false;
             }else{
                 check = true;
@@ -3994,10 +4268,10 @@ Stage *  EventHandler::preCheckCanBattle(User *user, int type, int chapter_id, i
             check = true;
         }else if(user->normal_chapter_id_ == stage->depend_chapter_){
             /*if(user->normal_stage_id_ >= stage->depend_stage_){
-                check = true;
-            }else{
-                check = false;
-            }*/
+              check = true;
+              }else{
+              check = false;
+              }*/
             if(user->normal_stage_id_ >= (int) game_config.stages_[user->normal_chapter_id_].size()-1){
                 check =  true;
             }else{
@@ -4035,11 +4309,23 @@ Stage *  EventHandler::preCheckCanBattle(User *user, int type, int chapter_id, i
     }
     else if (type == STAGE_TYPE_TRIAL) {
         //TODO 
-        //
+        stage = game_config.getTrialStage(chapter_id, stage_id);
+        if (stage == NULL) {
+            sendErrorResponse(fd, cmd_code, ERROR_STAGE_NOT_EXIST);
+            return NULL;
+        }
+        if (stage_id != user->trial_stage_id_) {
+            sendErrorResponse(fd, cmd_code, ERROR_STAGE_NOT_EXIST);
+            return NULL;
+        }
+        if (user->trial_instant_start_time_ > 0) {
+            sendErrorResponse(fd, cmd_code, ERROR_TRIAL_INSTANTING);
+            return NULL;
+        }
+        return stage;
     }
 
     return NULL;
-    
 }
 void EventHandler::costEnergyForBattle(User *user, Stage *stage)
 {
@@ -4053,6 +4339,7 @@ void EventHandler::costEnergyForBattle(User *user, Stage *stage)
         user->last_recover_time_ += add * game_config.recover_interval_;
     }
     user->energy_ -= stage->energy_required_;
+    LOG4CXX_INFO(logger_, "cost energy;"<<stage->energy_required_<<";"<<user->energy_);
 }
 void EventHandler::addBasicBattleReward(User *user, Stage *stage,int type)
 {
@@ -4105,7 +4392,7 @@ void EventHandler::setStageInfo(User *user)
             user->elite_chapter_id_ = user->battle_chapter_id_;
             user->elite_stage_id_ = user->battle_stage_id_;
         }
-        
+
     }
 }
 bool EventHandler::addStageReward(User *user, StageReward * rew,long long now)
@@ -4162,19 +4449,19 @@ bool EventHandler::dailyUpdateUser(User *user,int cmd_code,int fd)
     if(dateChange(now, user->last_login_time_)==false){
         return true;
     }
-    
+
     if(user->last_login_time_ == 0){
         bool check = initMission(user);
         if(check == false) return false;
     }
-    
+
     user->last_login_time_ = now;
     user->spark_daily_num_ = 0;
     user->send_energy_daily_limit_ = 0;
     user->receive_energy_daily_limit_ = 0;
     user->login_sum_ ++;
     user->buy_energy_daily_ = 0;
-    
+
     FriendInfo * fr = safeGetFriendInfo(user, FAKE_USER_ID, cmd_code, fd);
     if(fr != NULL){
         fr->last_receive_time_ = now;
@@ -4182,9 +4469,9 @@ bool EventHandler::dailyUpdateUser(User *user,int cmd_code,int fd)
         bool check = dh_->saveFriendInfo(fr);
         if(check == false) return false;
     }
-    
+
     for(map<long long ,Mission*>::iterator it = user->missions_.begin();
-        it!= user->missions_.end();it++){
+            it!= user->missions_.end();it++){
         if(it->second->mission_type_ == MISSION_LOGIN_SUM){
             it->second->mission_record_ = user->login_sum_;
             MissionConfig * mc = game_config.getMissionConfig(it->second->mission_type_, it->second->mission_subtype_);
@@ -4196,7 +4483,7 @@ bool EventHandler::dailyUpdateUser(User *user,int cmd_code,int fd)
             if(check == false) return false;
         }
     }
-    
+
     bool check = dh_->saveUser(user);
     if(dh_->db_error_ != 0 || check == false){
         sendErrorResponse(fd, cmd_code, ERROR_SYSTEM_CRITICAL_ERROR);
@@ -4237,32 +4524,32 @@ bool EventHandler::addAssistantReward(User *user, User *assistant)
     if(is_friend == false){
         user->spark_num_ = min(user->spark_num_+game_config.spark_assistant_is_friend_,game_config.spark_sum_limit_);
         user->spark_daily_num_ = min(user->spark_daily_num_ + game_config.spark_assistant_is_friend_,\
-                                     game_config.spark_daily_limit_);
+                game_config.spark_daily_limit_);
         //assistant->spark_num_ = min(assistant->spark_num_+game_config.spark_assistant_is_friend_,game_config.spark_sum_limit_);
         //assistant->spark_daily_num_ = min(assistant->spark_daily_num_ + game_config.spark_assistant_is_friend_,game_config.spark_daily_limit_);
     }else{
         user->spark_num_ = min(user->spark_num_+game_config.spark_assistant_not_friend_,game_config.spark_sum_limit_);
         user->spark_daily_num_ = min(user->spark_daily_num_ + game_config.spark_assistant_not_friend_,\
-                                     game_config.spark_daily_limit_);
+                game_config.spark_daily_limit_);
         //assistant->spark_num_ = min(assistant->spark_num_+game_config.spark_assistant_not_friend_,game_config.spark_sum_limit_);
         //assistant->spark_daily_num_ = min(assistant->spark_daily_num_ + game_config.spark_assistant_not_friend_,game_config.spark_daily_limit_);
     }
     /*bool check = dh_->saveUser(assistant);
-    if(check == false || dh_->db_error_ != 0){
-        return false;
-    }else{
-        return true;
-    }*/
+      if(check == false || dh_->db_error_ != 0){
+      return false;
+      }else{
+      return true;
+      }*/
     return true;
 }
 bool EventHandler::checkCost(User *user, EnhanceCost &ec)
 {
     if(ec.type == ITEM_TYPE_RESOURCE){
         for(map<long long,Item *>::iterator it = user->items_.begin();
-            it!=user->items_.end();it++){
+                it!=user->items_.end();it++){
             if(it->second->type_ == ITEM_TYPE_RESOURCE
-               && it->second->mid_ == ec.mid
-               && it->second->amount_ >= ec.param){
+                    && it->second->mid_ == ec.mid
+                    && it->second->amount_ >= ec.param){
                 return true;
             }
         }
@@ -4281,7 +4568,7 @@ bool EventHandler::safeCost(User *user, EnhanceCost &ec,int cmd_code,int fd)
         map<long long,Item *>::iterator it = user->items_.begin();
         for(;it!= user->items_.end();it++){
             if(it->second->type_ == ec.type
-               && it->second->mid_ == ec.mid){
+                    && it->second->mid_ == ec.mid){
                 break;
             }
         }
@@ -4308,6 +4595,8 @@ bool EventHandler::sendSystemMail(User *user)
     for(size_t i = 0;i<game_config.mail_config_.size();i++){
         if(now > game_config.mail_config_[i].end_time || now < game_config.mail_config_[i].start_time)continue;
         int mid = game_config.mail_config_[i].mid;
+        //trial instant prize 
+        if (mid == MAIL_TYPE_TRIAL_INSTANT) continue;
         int position = ((mid-1)/SYSTEM_MAIL_RECORD_INTERVAL)%SYSTEM_MAIL_RECORD_LENGTH + 1;
         int offset = (mid - 1)%SYSTEM_MAIL_RECORD_INTERVAL;
         if((mid-1)/SYSTEM_MAIL_RECORD_INTERVAL > user->system_mail_record_[0]){
@@ -4323,7 +4612,8 @@ bool EventHandler::sendSystemMail(User *user)
             acceptable = 0;
         }
         string text = itoa(mid);
-        bool check = dh_->addNewMail(user, SYSTEM_MAIL_SENDER_ID, game_config.mail_config_[i].title, text, acceptable);
+        string str="";
+        bool check = dh_->addNewMail(user, SYSTEM_MAIL_SENDER_ID, game_config.mail_config_[i].title, text, acceptable, 0, str);
         if(check == false || dh_->db_error_ != 0){
             return false;
         }
@@ -4348,7 +4638,7 @@ bool EventHandler::addDailyFreshMission(User * user)
 bool EventHandler::addSendEnergyMission(User *user)
 {
     for(map<long long ,Mission*>::iterator it = user->missions_.begin();
-        it!=user->missions_.end();){
+            it!=user->missions_.end();){
         if(it->second->mission_type_ == MISSION_SEND_ENERGY ){
             it->second->add_time_ = time(NULL);
             it->second->mission_record_ = 0;
@@ -4360,10 +4650,10 @@ bool EventHandler::addSendEnergyMission(User *user)
     }
     for(size_t i = 0 ;i<game_config.mission_config_[MISSION_SEND_ENERGY].size();i++){
         bool check = dh_->addNewMission(user,
-                                        MISSION_SEND_ENERGY,
-                                        game_config.mission_config_[MISSION_SEND_ENERGY][i].subtype,
-                                        0,
-                                        MISSION_NOT_COMPLETED);
+                MISSION_SEND_ENERGY,
+                game_config.mission_config_[MISSION_SEND_ENERGY][i].subtype,
+                0,
+                MISSION_NOT_COMPLETED);
         if(check == false) return false;
     }
     return true;
@@ -4371,7 +4661,7 @@ bool EventHandler::addSendEnergyMission(User *user)
 bool EventHandler::addDailyRewardMission(User *user)
 {
     for(map<long long ,Mission*>::iterator it = user->missions_.begin();
-        it!=user->missions_.end();){
+            it!=user->missions_.end();){
         if(it->second->mission_type_ == MISSION_DAILY_REWARD ){
             return true;
         }else{
@@ -4380,10 +4670,10 @@ bool EventHandler::addDailyRewardMission(User *user)
     }
     for(size_t i = 0 ;i<game_config.mission_config_[MISSION_DAILY_REWARD].size();i++){
         bool check = dh_->addNewMission(user,
-                                        MISSION_DAILY_REWARD,
-                                        game_config.mission_config_[MISSION_DAILY_REWARD][i].subtype,
-                                        1,
-                                        MISSION_COMPLETED);
+                MISSION_DAILY_REWARD,
+                game_config.mission_config_[MISSION_DAILY_REWARD][i].subtype,
+                1,
+                MISSION_COMPLETED);
         if(check == false) return false;
     }
     return true;
@@ -4440,7 +4730,7 @@ bool EventHandler::initMission(User *user)
 bool EventHandler::updateMissionAfterBattle(User *user,vector<Mission *> &mv)
 {
     for(map<long long ,Mission*>::iterator it = user->missions_.begin();
-        it!=user->missions_.end();it++){
+            it!=user->missions_.end();it++){
         if(it->second->mission_type_ == MISSION_LEVEL_UP){
             if(user->user_level_ > it->second->mission_record_){
                 it->second->mission_record_ = user->user_level_;
@@ -4454,15 +4744,15 @@ bool EventHandler::updateMissionAfterBattle(User *user,vector<Mission *> &mv)
             }
         }else if(it->second->mission_type_ == MISSION_NORMAL_CHAPTER_CLEAR){
             /*if(user->normal_chapter_id_ > it->second->mission_record_){
-                it->second->mission_record_ = user->normal_chapter_id_;
-                MissionConfig * mc = game_config.getMissionConfig(it->second->mission_type_, it->second->mission_subtype_);
-                if(user->normal_chapter_id_ >= mc->param && it->second->complete_ == MISSION_NOT_COMPLETED){
-                    it->second->complete_ = MISSION_COMPLETED;
-                    mv.push_back(it->second);
-                }
-                bool check = dh_->saveMission(it->second);
-                if(check == false) return false;
-            }*/
+              it->second->mission_record_ = user->normal_chapter_id_;
+              MissionConfig * mc = game_config.getMissionConfig(it->second->mission_type_, it->second->mission_subtype_);
+              if(user->normal_chapter_id_ >= mc->param && it->second->complete_ == MISSION_NOT_COMPLETED){
+              it->second->complete_ = MISSION_COMPLETED;
+              mv.push_back(it->second);
+              }
+              bool check = dh_->saveMission(it->second);
+              if(check == false) return false;
+              }*/
             int uchapter_id = user->normal_chapter_id_;
             if(user->normal_stage_id_ == (int) game_config.stages_[uchapter_id].size() - 1){
                 MissionConfig * mc = game_config.getMissionConfig(it->second->mission_type_, it->second->mission_subtype_);
@@ -4477,17 +4767,17 @@ bool EventHandler::updateMissionAfterBattle(User *user,vector<Mission *> &mv)
 
         }else if(it->second->mission_type_ == MISSION_ELITE_CHAPTER_CLEAR){
             /*if(user->elite_chapter_id_ > it->second->mission_record_){
-                it->second->mission_record_ = user->elite_chapter_id_;
-                MissionConfig * mc = game_config.getMissionConfig(it->second->mission_type_, it->second->mission_subtype_);
-                if(user->elite_chapter_id_ >= mc->param && it->second->complete_ == MISSION_NOT_COMPLETED){
-                    it->second->complete_ = MISSION_COMPLETED;
-                    mv.push_back(it->second);
-                }
-                bool check = dh_->saveMission(it->second);
-                if(check == false) return false;
-            }*/
+              it->second->mission_record_ = user->elite_chapter_id_;
+              MissionConfig * mc = game_config.getMissionConfig(it->second->mission_type_, it->second->mission_subtype_);
+              if(user->elite_chapter_id_ >= mc->param && it->second->complete_ == MISSION_NOT_COMPLETED){
+              it->second->complete_ = MISSION_COMPLETED;
+              mv.push_back(it->second);
+              }
+              bool check = dh_->saveMission(it->second);
+              if(check == false) return false;
+              }*/
             int uchapter_id = user->elite_chapter_id_;
-            
+
             if(user->elite_stage_id_ == (int) game_config.elite_stages_[uchapter_id].size() - 1){
                 MissionConfig * mc = game_config.getMissionConfig(it->second->mission_type_, it->second->mission_subtype_);
                 it->second->mission_record_ = uchapter_id;
@@ -4563,8 +4853,9 @@ bool EventHandler::setEliteDaily(User * user,int chapter_id ,int stage_id)
     check = dh_->saveStageRecord(it->second);
     if(check == false) return false;
     return true;
-    
+
 }
+
 bool EventHandler::setSpecialDaily(User * user,int chapter_id ,int stage_id)
 {
     if(chapter_id == 0 || stage_id == 0 ) return false;
@@ -4591,8 +4882,47 @@ bool EventHandler::setSpecialDaily(User * user,int chapter_id ,int stage_id)
     check = dh_->saveStageRecord(it->second);
     if(check == false) return false;
     return true;
-    
+
 }
+
+bool EventHandler::setTrialDaily(User *user, int chapter_id, int stage_id) {
+    if (chapter_id == 0 || stage_id == 0) {
+        return false;
+    }
+    long long now = time(NULL);
+    int srkey = getTrialChaptertoSave(chapter_id);
+    map <int, StageRecord *>::iterator it = user->stage_record_.find(srkey);
+    if (it == user->stage_record_.end()) {
+        if (dh_->addNewStageRecord(user, srkey, stage_id) == false) {
+            return false;
+        }
+        it = user->stage_record_.find(srkey);
+    }
+    if (it != user->stage_record_.end()) {
+        StageRecord *sr = it->second;
+
+        int new_stage = 0;
+        while (stage_id >= (int) sr->record_.size()) {
+            sr->record_.push_back(1);
+            new_stage = 1;
+        }
+        sr->record_[stage_id] = 1;
+        sr->update_time_ = now;
+
+        user->trial_stage_id_ = stage_id + 1;
+
+        if (stage_id > user->trial_max_stage_id_) {
+            user->trial_max_stage_id_ = stage_id;
+            dh_->updateTrialRank(user->uid_, stage_id, now);
+        }
+            
+        dh_->saveUserTrialInfo(user);
+
+        return dh_->saveStageRecord(sr);
+    }
+    return false;
+}
+
 bool EventHandler::resetEliteDaily(User * user, int type, int chapter_id ,int stage_id)
 {
     if(chapter_id == 0 || stage_id == 0 ) return false;
@@ -4619,6 +4949,60 @@ bool EventHandler::resetEliteDaily(User * user, int type, int chapter_id ,int st
     if(check == false) return false;
     return true;
 }
+
+void EventHandler::trialDailyCheck(User *user, int chapter_id) {
+
+    int srkey = getTrialChaptertoSave(chapter_id);
+
+    map <int, StageRecord *>::iterator iter = user->stage_record_.find(srkey);
+    if (iter == user->stage_record_.end()) {
+        return;
+    } 
+    StageRecord *sr = iter->second;
+    
+    long long now = time(NULL);
+    bool datechange = dateChange(now, sr->update_time_);
+    if (datechange) {
+        user->trial_daily_reset_ = 0;
+        dh_->saveUserTrialInfo(user);
+    }
+    return ;
+}
+
+/*
+int EventHandler::resetTrialStage(User * user, int chapter_id) {
+    if(chapter_id == 0 || stage_id == 0 ) return -1;
+
+    int succ = 1;
+    long long now = time(NULL);
+
+    int srkey = getChaptertoSaveKey(STAGE_TYPE_TRIAL, chapter_id);
+
+    map<int, StageRecord *>::iterator it = user->stage_record_.find(srkey);
+    if(it != user->stage_record_.end()){
+
+        trialDailyCheck(user);
+
+        StageRecord *sr = it->second;
+
+        //trial daily limit
+        if (user->trial_daily_reset_ >= game_config.trial_daily_reset_limit_) {
+            return ERROR_TRIAL_RESET_COUNT_ERROR;
+        }
+        for (size_t i = 0; i < sr->record_.size(); i++) {
+            sr->record_[i] = 0;
+        }
+
+        sr->update_time_ = now;
+
+        if (dh_->saveStageRecord(sr)) {
+            succ = 0;
+        }
+    }
+    return 1;
+}
+*/
+
 bool EventHandler::specialTimeCheck(User *user, Stage *stage, long long now)
 {
     SpecialStageCondition * ssc = stage->ssc_;
@@ -4684,14 +5068,31 @@ bool EventHandler::preCheckLeadership(User *user, Hero *hero, vector<Soldier *> 
     if(count > leadership) return false;
     else return true;
 }
+
+int EventHandler::getChaptertoSaveKey(int type, int chapter_id) {
+    int ret = chapter_id;
+    if (type == STAGE_TYPE_SPECIAL) {
+        ret = getSpecialChaptertoSave(chapter_id);
+    }
+    else if (type == STAGE_TYPE_TRIAL) {
+        ret = getTrialChaptertoSave(chapter_id);
+    }
+    return ret;
+}
+
 int EventHandler::getSpecialChaptertoSave(int chapter_id)
 {
     return chapter_id + 10000;
 }
+
+int EventHandler::getTrialChaptertoSave(int chapter_id) {
+    return chapter_id + 20000;
+}
+
 Team * EventHandler::inTeamHero(User *user, long long hero_id)
 {
     for(map<long long,Team*>::iterator it = user->teams_.begin();
-        it!= user->teams_.end();it++){
+            it!= user->teams_.end();it++){
         if(hero_id == it->second->hero_id_) return it->second;
     }
     return NULL;
@@ -4699,7 +5100,7 @@ Team * EventHandler::inTeamHero(User *user, long long hero_id)
 Team * EventHandler::inTeamSoldier(User *user, long long soldier_id)
 {
     for(map<long long,Team*>::iterator it = user->teams_.begin();
-        it!= user->teams_.end();it++){
+            it!= user->teams_.end();it++){
         for(size_t i = 0 ;i<it->second->soldier_id_.size();i++){
             if(it->second->soldier_id_[i] == soldier_id) return it->second;
         }
@@ -4720,14 +5121,14 @@ Act * EventHandler::getAct(User *user, int act_id)
 {
     ActConfig * ac = game_config.getActConfig(act_id);
     if(ac == NULL) return NULL;
-    
+
     map<int,Act *>::iterator it = user->act_record_.find(act_id);
     if(it == user->act_record_.end()){
         bool check = dh_->addNewActRecord(user, act_id);
         if(check == false) return NULL;
     }
     it = user->act_record_.find(act_id);
-    
+
     if(it->second->version_ != ac->version_){
         initAct(it->second,ac->version_);
     }
@@ -4862,12 +5263,4 @@ size_t writeDataCurl(void *buffer, size_t size, size_t nmemb, void *userp)
     return size * nmemb;
 }
 
-void EventHandler::processInstantTrial(EventCmd &e, vector<string> &check_cmd) {
-}
-
-void EventHandler::processTrialProgress(EventCmd &e, vector<string> &check_cmd) {
-}
-
-void EventHandler::processGetTrialRank(EventCmd &e, vector<string> &check_cmd) {
-}
 

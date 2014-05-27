@@ -60,6 +60,11 @@ typedef int gold_type;
 #define SOUL_TYPE_HERO 1
 #define SOUL_TYPE_SOLDIER 2
 
+//mail type
+enum MAIL_TYPE_ {
+    MAIL_TYPE_TRIAL_INSTANT = 4,
+};
+
 #define SYSTEM_MAIL_SENDER_ID 0
 #define SYSTEM_MAIL_RECORD_INTERVAL 30
 #define SYSTEM_MAIL_RECORD_LENGTH 3
@@ -194,6 +199,8 @@ typedef int gold_type;
 #define CMD_INSTANT_TRIAL 78
 #define CMD_TRIAL_PROGRESS 79
 #define CMD_GET_TRIAL_RANK 80
+#define CMD_TRIAL_RESET 81
+#define CMD_TRIAL_RELIVE 82
 
 //error
 #define ERROR_SYSTEM_CRITICAL_ERROR 1
@@ -262,8 +269,15 @@ typedef int gold_type;
 #define ERROR_ACT_NOT_AVAIABLE 64
 #define ERROR_TEAM_CANNOT_BE_FOUND 65
 #define ERROR_STAGE_NOT_PASSED 66
+#define ERROR_TRIAL_RESET_COUNT_ERROR 67
+#define ERROR_TRIAL_RESET_NO_RECORD 68
+#define ERROR_TRIAL_INSTANTING 69
+#define ERROR_TRIAL_NO_INSTANT 70
+#define ERROR_TRIAL_SAVE_STAGE_RECORD 71
+#define ERROR_TRIAL_RELIVE_STAGE_ERROR 72
+#define ERROR_TRIAL_RELIVE_DIAMOND_NOT_ENOUGH 73
 
-#define CMD_TYPE 78
+#define CMD_TYPE 83 
 static string cmd_list[] = {
     "register",//0
     "login",//1
@@ -346,6 +360,8 @@ static string cmd_list[] = {
     "instanttrial", //78
     "trialprogress", //79
     "trialrank", //80
+    "resettrial", //81
+    "trialrelive",//82
 };
 
 #define ACT_1 1 //首充三倍

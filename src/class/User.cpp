@@ -50,6 +50,9 @@ User::User()
     military = 0;
     load_staus_ = 0ll;
     dirty_ = false;
+
+    trial_instant_start_time_ = 0;
+    trial_daily_reset_ = 0;
 }
 User::~User()
 {

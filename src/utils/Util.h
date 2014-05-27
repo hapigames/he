@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <stdio.h>
 #include <algorithm>
 #include <iomanip>
 #include <map>
@@ -35,4 +36,10 @@ string vectorIntToString(vector<int> &v);
 string itoa(int input);
 bool checkString(string & str);
 void base64_encode(unsigned char *in, const int in_len, unsigned char *out, int out_len);
+int saveint(int data, FILE *fp);
+int loadint(int &data, FILE *fp);
+long long loadlonglong(long long &data, FILE *fp);
+int savelonglong(long long data, FILE* fp);
+int savestring(const char *str, int size, FILE *fp);
+int loadstring(string &str, FILE *fp);
 #endif

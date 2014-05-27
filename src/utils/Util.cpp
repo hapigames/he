@@ -164,3 +164,45 @@ void base64_encode(unsigned char *in, const int in_len, unsigned char *out, int 
 	}
 	*p = 0;
 }
+
+int saveint(int data, FILE *fp) {
+    return fwrite(&data, sizeof(data), 1, fp) == 1;
+}
+
+int loadint(int &data, FILE *fp) {
+    return fread(&data, sizeof(data), 1, fp) == 1;
+}
+
+long long loadlonglong(long long &data, FILE *fp) {
+    return fread(&data, sizeof(data), 1, fp) == 1;
+}
+
+int savelonglong(long long data, FILE* fp) {
+    return fwrite(&data, sizeof(data), 1, fp) == 1;
+}
+
+int savestring(const char *str, int size, FILE *fp) {
+    if (fwrite(&size, sizeof(size), 1, fp) == 1) {
+        return (int)fwrite(str, sizeof(char), size, fp) == size;
+    }   
+    return 0;
+}
+
+int loadstring(string &str, FILE *fp) {
+    int ret = 0;
+    int s = 0;
+    if (loadint(s, fp)) {
+        char *buf = (char*)malloc(sizeof(char)*s);
+        if (buf != NULL) {
+            if ((int)fread(buf, sizeof(char), s, fp) == s) {
+                str.assign(buf, s); 
+                ret = s;
+            }   
+            free(buf);
+        }   
+    }   
+    return ret;
+}
+
+
+

@@ -37,6 +37,7 @@ public:
         pthread_mutex_unlock(&write_mutex_);
     }
     bool prepareToWrite(string &s);
+    bool prepareToWrite(const char *str, size_t len);
     bool write(bool block  = false);
 
     int fd_;

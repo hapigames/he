@@ -80,10 +80,10 @@ public:
     int send_energy_daily_limit_;
 
     //TODO
-    int trial_stage_id_;
-    int trial_max_stage_id_;
-    int trial_daily_reset_;
-    long long trial_instant_start_time_;
+    int trial_stage_id_; //28
+    int trial_max_stage_id_; //29
+    int trial_daily_reset_; //30
+    long long trial_instant_start_time_; //31
 
     
     vector<int> system_mail_record_;

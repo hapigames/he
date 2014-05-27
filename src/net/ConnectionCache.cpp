@@ -149,6 +149,35 @@ bool ConnectionCache::prepareToWrite(string &s)
     return true;
 }
 
+bool ConnectionCache::prepareToWrite(const char *str, size_t len) {
+    lockWrite();
+    int size = len + 1;
+    if(size > (int)wsize_ - 1 - wpos_){
+        size_t nwsize = max((int)wsize_ * 2,(int)wpos_ + size + 1024);
+        printf("resize wbuf\n");
+        char * nwbuf = new(nothrow)char[nwsize];
+        if(nwbuf == NULL){
+            printf("resize wbuf failed\n");
+            unlockWrite();
+            return false;
+        }else{
+            if(wpos_>0){
+                memcpy(nwbuf,wbuf_,wpos_);
+            }
+            delete wbuf_;
+            wsize_ = nwsize;
+            wbuf_ = nwbuf;
+        }
+    }
+    memcpy(wbuf_ + wpos_, str, size);
+    wpos_ += size;
+    wbuf_[wpos_] = '\0';
+    wpos_ ++;
+    printf("ready to send:%s\n",wbuf_);
+    unlockWrite();
+    return true;
+}
+
 bool ConnectionCache::write(bool block)
 {
     lockWrite();

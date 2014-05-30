@@ -182,6 +182,9 @@ string buildBattleStartResponse(User * user)
         StageReward * sr = user->rewards_[i];
         if(sr == NULL) continue;
         ost<<sr->type<<","<<sr->subtype;
+        if(sr->type == ITEM_TYPE_GOLD || sr->type == ITEM_TYPE_DIAMOND){
+            ost<<","<<sr->param_1;
+        }
         if(sr->type == ITEM_TYPE_HERO || sr->type == ITEM_TYPE_SOLDIER){
             ost<<","<<sr->param_1<<","<<sr->param_2;
         }
@@ -200,6 +203,20 @@ string buildUserRewardsContent(User *user) {
     }
     return ost.str();
 }
+
+string buildUserRewardsContent(vector <StageReward> &rewards) {
+    ostringstream ost;
+    ost<<rewards.size()<<";";
+
+    for (size_t i = 0; i < rewards.size(); i++) {
+        StageReward *sr = &rewards[i];
+        if (sr == NULL) continue;
+        ost<<sr->type<<","<<sr->subtype<<","<<sr->param_1<<","<<sr->param_2<<";";
+    }
+
+    return ost.str();
+}
+
 
 int parseUserRewardsContent(vector <StageReward>& strewards, const string &contents) {
 

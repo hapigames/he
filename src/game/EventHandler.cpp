@@ -7,6 +7,7 @@
 //
 
 #include "EventHandler.h"
+#include "../utils/hstring.h"
 
 
 
@@ -3664,7 +3665,12 @@ void EventHandler::processInstantTrial(EventCmd &e, vector<string> &check_cmd) {
         timeleft = need_time - (now - user->trial_instant_start_time_);;
     
         dh_->saveUserTrialInfo(user);
+
+        hstring logstr(",");
+        logstr<<uid<<user->trial_stage_id_<<user->trial_max_stage_id_<<now;
+        LOG4CXX_DEBUG(logger_, "trialinstant: "<<logstr);
     }
+
 
     ostringstream ost;
     ost<<cmd_list[CMD_INSTANT_TRIAL]<<";"<<succ<<";"<<timeleft;
@@ -3728,16 +3734,14 @@ void EventHandler::processTrialProgress(EventCmd &e, vector<string> &check_cmd) 
                     for(size_t j = 0; j<stage->rewards_.size(); j++){
                         int pby = rand()%PBY_PRECISION;
                         if(pby<stage->rewards_[j].pby){
-                            user->rewards_.push_back(&(stage->rewards_[j]));
+                            game_config.insertRewardStage(streward, stage->rewards_[j]);
                         }
                     }
-                    streward.push_back(StageReward(ITEM_TYPE_GOLD, 0, stage->reward_gold_, 0));
+                    StageReward str(ITEM_TYPE_GOLD, 0, stage->reward_gold_, 0);
+                    game_config.insertRewardStage(streward, str);
+
                 }
-                for (size_t i = 0; i < streward.size(); i++) {
-                    user->rewards_.push_back(&(streward[i]));
-                }
-                string contents = buildUserRewardsContent(user);
-                //TODO log
+                string contents = buildUserRewardsContent(streward);
                 string title="title";
                 string text= itoa(MAIL_TYPE_TRIAL_INSTANT);
                 //get mail text and title
@@ -3745,14 +3749,18 @@ void EventHandler::processTrialProgress(EventCmd &e, vector<string> &check_cmd) 
                 if (mc) {
                     title = mc->title;
                 }
-                dh_->addNewMail(user, SYSTEM_MAIL_SENDER_ID, title, text, 1, (int)user->rewards_.size(), contents);
+                dh_->addNewMail(user, SYSTEM_MAIL_SENDER_ID, title, text, 1, MAIL_TYPE_TRIAL_INSTANT, contents);
 
-                user->rewards_.clear();
                 user->trial_instant_start_time_ = 0;
                 user->trial_stage_id_ = user->trial_max_stage_id_ + 1;
 
+                hstring logstr(",");
+                logstr<<uid<<user->trial_stage_id_<<user->trial_max_stage_id_<<user->trial_instant_start_time_;
+                LOG4CXX_INFO(logger_, "trialinstantprize: "<<logstr<<","<<contents);
+                
                 if (!dh_->saveStageRecord(sr) || !dh_->saveUserTrialInfo(user)) {
-                    succ = ERROR_TRIAL_SAVE_STAGE_RECORD;
+                    LOG4CXX_ERROR(logger_, "trial;save trial info data failed");
+                    //succ = ERROR_TRIAL_SAVE_STAGE_RECORD;
                 }
             }
             else {
@@ -3811,13 +3819,16 @@ void EventHandler::processResetTrialStage(EventCmd &e, vector <string> &check_cm
     safeLoadStageRecord(user, CMD_TRIAL_RESET, e.fd_);
 
     //TODO can not reset when instant
-    //
+    int succ = 0;
+    if (user->trial_instant_start_time_ > 0) {
+        succ = ERROR_TRIAL_INSTANTING;
+    }
+
     long long now = time(NULL);
     int srkey = getTrialChaptertoSave(chapter_id);
-    int succ = 0;
 
     map<int, StageRecord *>::iterator it = user->stage_record_.find(srkey);
-    if(it != user->stage_record_.end()){
+    if(succ == 0 && it != user->stage_record_.end()){
 
         trialDailyCheck(user, chapter_id);
 
@@ -3831,14 +3842,18 @@ void EventHandler::processResetTrialStage(EventCmd &e, vector <string> &check_cm
             for (size_t i = 1; i < sr->record_.size(); i++) {
                 sr->record_[i] = 0;
             }
+            user->trial_stage_id_ = 1;
+            user->trial_daily_reset_ ++;
+            dh_->saveUserTrialInfo(user);
+            sr->update_time_ = now;
+            dh_->saveStageRecord(sr);
+
+            hstring logstr(",");
+            logstr<<uid<<user->trial_stage_id_<<user->trial_max_stage_id_<<user->trial_daily_reset_;
+            LOG4CXX_INFO(logger_, "trialreset: "<<logstr);
         }
-        user->trial_stage_id_ = 1;
-        user->trial_daily_reset_ ++;
-        dh_->saveUserTrialInfo(user);
-        sr->update_time_ = now;
-        dh_->saveStageRecord(sr);
     }
-    else {
+    else if (succ == 0 ) {
         succ = ERROR_TRIAL_RESET_NO_RECORD;
     }
 
@@ -3872,6 +3887,9 @@ void EventHandler::processTrialRelive(EventCmd &e, vector <string> &check_cmd) {
     else {
         user->diamond_ --;
         //TODO log
+        hstring logstr(",");
+        logstr<<uid<<chid<<stid<<user->diamond_;
+        LOG4CXX_INFO(logger_, "tiralrelive: "<<logstr);
     }
     ostringstream ost;
     ost<<cmd_list[CMD_TRIAL_RELIVE]<<";"<<succ<<";"<<user->diamond_;

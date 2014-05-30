@@ -242,6 +242,9 @@ public:
     PaymentConfig * getPaymentConfig(string &product_id);
     PaymentConfig * getPaymentConfigByLocal(int local);
     ActConfig * getActConfig(int act_id);
+
+    int  rewardCombine(int type);
+    void insertRewardStage(vector <StageReward> &rewards, StageReward &sr);
     
     
     /////////////////////////////////////////////////

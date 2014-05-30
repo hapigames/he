@@ -346,7 +346,6 @@ bool GameConfig::loadFromFile()
         for (int i = 0; i < tsreward.getLength(); i++) {
             int chid = tsreward[i]["chapter"];
             int stid = tsreward[i]["stage"];
-	    LOG4CXX_INFO(logger_, "trial reward: " << chid << "  "<<stid);
             map <int, vector <Stage> >::iterator iter = trial_stages_.find(chid);
             if (iter == trial_stages_.end()) {
                 return false;
@@ -862,3 +861,30 @@ ActConfig * GameConfig::getActConfig(int act_id)
     if(now < it->second->start_ || now > it->second->end_) return NULL;
     return it->second;
 }
+
+int GameConfig::rewardCombine(int type) {
+    int combine = 1;
+    switch (type) {
+        case ITEM_TYPE_HERO:
+        case ITEM_TYPE_SOLDIER:
+        case ITEM_TYPE_RESOURCE:
+            combine = 0;
+            break;
+        default:
+            break;
+    }
+    return combine;
+}
+
+void GameConfig::insertRewardStage(vector <StageReward> &rewards, StageReward &sr) {
+    if (rewardCombine(sr.type)) {
+        for (size_t i = 0; i < rewards.size(); i++) {
+            if (rewards[i].type == sr.type && rewards[i].subtype == sr.subtype) {
+                rewards[i].param_1 += sr.param_1;
+                return;
+            }
+        }
+    }
+    rewards.push_back(sr);
+}
+

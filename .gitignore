@@ -31,3 +31,4 @@ src/utils/Makefile
 src/utils/cmake_install.cmake
 src/utils/libutils.a
 game.cfg
+cfg/

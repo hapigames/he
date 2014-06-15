@@ -90,12 +90,23 @@ int getAuthorizeCode(uid_type uid)
     
 }
 int get_cmd_id(string &cmd){
+    int i = 0;
+    while (cmd_list[i].size() > 0) {
+        if (cmd == cmd_list[i]) {
+            return i;
+        }
+        i++;
+    }
+    return -1; 
+
+    /*
     for(int i = 0;i<CMD_TYPE;i++){
         if(cmd == cmd_list[i]){
             return i;
         }
     }
     return -1;
+    */
 }
 string vectorLongToString(vector<long long> &v)
 {

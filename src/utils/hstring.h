@@ -1,3 +1,6 @@
+#ifndef __HSTRING_H__
+#define __HSTRING_H__
+
 #include <iostream>
 #include <sstream>
 
@@ -19,14 +22,21 @@ public:
     }
 
     virtual ~hstring() {
+        clear();
+    }
+    
+    void clear() {
         oss_.str("");
         oss_.clear();
         delim_.clear();
     }
-    
 
     const char *str() const {
         return oss_.str().c_str();
+    }
+
+    size_t size() const {
+        return oss_.str().size();
     }
 
 
@@ -116,11 +126,18 @@ public:
         return *this;
     }
     
-    //friend ostream& operator <<(ostream &os, const hstring &data);
+    friend ostream& operator <<(ostream &os, const hstring &data) {
+        os<<data.str();
+        return os;
+    }
 };
 
+/*
 ostream& operator <<(ostream &os, const hstring &data) {
     os<<data.str();
     return os;
 }
+*/
+
+#endif //__HSTRING_H__
 

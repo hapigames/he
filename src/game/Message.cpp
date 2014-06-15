@@ -734,3 +734,109 @@ string buildForceSEUResponse()
     ost<<cmd_list[CMD_FORCESEU]<<";0";
     return ost.str();
 }
+
+void buildLoadBuildingsResponse(hstring &hstr, User *user) {
+    
+    hstr<<cmd_list[CMD_LOAD_BUILDINGS]<<0<<user->uid_<<user->pvp_team_id_<<user->build_infs_.size();
+
+    for (map <long long, BuildInf>::iterator iter = user->build_infs_.begin(); iter != user->build_infs_.end(); iter++) {
+        hstring buildstr(",");
+        const BuildInf &binf = iter->second;
+
+        buildstr<<binf.id_<<binf.mid_<<binf.level_<<binf.position_<<binf.gem_type_;
+
+        hstr<<buildstr;
+
+        buildstr.clear();
+    }
+    hstr<<user->honor_<<user->gold_<<user->diamond_<<user->wood_<<user->stone_;
+}
+
+void buildStartBuildingsResponse(hstring &hstr, User *user) {
+    
+    hstr<<cmd_list[CMD_LOAD_BUILDINGS_BY_ID]<<0<<user->uid_;
+    bool had_team = false;
+    long long pvp_hid = 0;
+    if (user->pvp_team_id_ > 0) {
+        map <long long, Team *>::iterator iter = user->teams_.find(user->pvp_team_id_);
+        if (iter != user->teams_.end()) {
+
+            Team * team = iter->second;
+
+            map <long long, Hero *>::iterator hiter = user->heroes_.find(team->hero_id_);
+            if (hiter != user->heroes_.end()) {
+                hstr<<hiter->second->mid_<<hiter->second->star_<<hiter->second->level_;
+            }
+            else {
+                hstr<<0<<0<<0;
+            }
+
+            pvp_hid = team->hero_id_;
+
+            hstr<<team->soldier_id_.size();
+            for (size_t i = 0; i < team->soldier_id_.size(); i++) {
+
+                hstring stmp(",");
+
+                map <long long, Soldier *>::iterator siter = user->soldiers_.find(team->soldier_id_[i]);
+                if (siter != user->soldiers_.end()) {
+                    stmp<<siter->second->mid_<<siter->second->star_<<siter->second->level_;      
+                }
+                else {
+                    stmp<<1<<1<<1;
+                }
+                hstr<<stmp;
+                stmp.clear();
+            }
+
+            had_team = true;
+        }
+
+    }
+    if (!had_team) {
+        hstr<<0<<0<<0;
+        hstr<<0;
+    }
+
+    int gnum = 0;
+    if (pvp_hid > 0) {
+        for (size_t i = 0; i < user->gear_infs_.size(); i++) {
+            if (user->gear_infs_[i].hero_id_ > 0 && user->gear_infs_[i].hero_id_ == pvp_hid) {
+                gnum ++;
+            }
+        }
+    }
+    hstr<<gnum;
+    if (gnum > 0) {
+        for (size_t i = 0; i < user->gear_infs_.size(); i++) {
+            GearInf &ginf = user->gear_infs_[i];
+            if (ginf.hero_id_ > 0 && ginf.hero_id_ == pvp_hid) {
+                
+                hstring htmp(",");
+                htmp<<ginf.mid_<<ginf.level_;
+
+                hstr<<htmp;
+                htmp.clear();
+            }
+        }
+    }
+
+    
+    hstr<<user->build_infs_.size();
+
+    for (map <long long, BuildInf>::iterator iter = user->build_infs_.begin(); iter != user->build_infs_.end(); iter++) {
+        hstring buildstr(",");
+        const BuildInf &binf = iter->second;
+
+        buildstr<<binf.id_<<binf.mid_<<binf.level_<<binf.position_<<binf.gem_type_;
+
+        hstr<<buildstr;
+
+        buildstr.clear();
+    }
+
+    //TODO 计算获得的资源数
+    hstr<<1<<1<<0<<1<<1;
+}
+
+

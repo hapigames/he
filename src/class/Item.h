@@ -24,6 +24,7 @@ public:
     int amount;
     int gold;
 };
+
 class Item
 {
 public:
@@ -37,6 +38,21 @@ public:
     int amount_;//4
     long long get_time_;
     
+};
+
+
+class GearInf {
+public:
+    GearInf():id_(0),uid_(0), hero_id_(0), mid_(0), level_(0) {}
+    GearInf(int gid, int uid, int hid, int mid, int lv)
+        :id_(gid), uid_(uid), hero_id_(hid), mid_(mid), level_(lv) {}
+
+    long long id_;
+    long long uid_;
+    long long hero_id_; //被装备在哪个英雄上
+    int mid_;
+    int level_;
+
 };
 
 #endif

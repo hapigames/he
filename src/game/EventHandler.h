@@ -132,6 +132,27 @@ public:
     void processGetTrialRank(EventCmd &e, vector <string> &cmd);
     void processResetTrialStage(EventCmd &e, vector <string> &cmd);
     void processTrialRelive(EventCmd &e, vector <string> &check_cmd);
+
+    bool safeLoadBuildings(User *user, int cmd, int fd);
+    bool safeLoadPvpHeros(User *user, int cmd, int fd);
+    bool safeLoadPvpGears(User *user, int cmd, int fd);
+    bool safeLoadHonorExcStatus(User *user, int cmd, int fd);
+
+    void processLoadbuildings(EventCmd &e, vector<string> &check_cmd) ;
+    void processLoadBuildingsById(EventCmd &e, vector<string> &check_cmd) ;
+    void processPvpRanks(EventCmd &e, vector<string> &check_cmd) ;
+    void processPvpTargets(EventCmd &e, vector<string> &check_cmd) ;
+    void processPvpBattleStart(EventCmd &e, vector<string> &check_cmd) ;
+    void processPvpBattleEnd(EventCmd &e, vector<string> &check_cmd) ;
+    void processAddBuilding(EventCmd &e, vector<string> &check_cmd) ;
+    void processSaveBuildings(EventCmd &e, vector<string> &check_cmd) ;
+    void processUpgradeBuilding(EventCmd &e, vector<string> &check_cmd) ;
+    void processDestroyBuilding(EventCmd &e, vector<string> &check_cmd) ;
+    void processSetGem(EventCmd &e, vector<string> &check_cmd) ;
+    void processLoadHonorExcStatus(EventCmd &e, vector<string> &check_cmd) ;
+    void processHonorExc(EventCmd &e, vector<string> &check_cmd) ;
+    void processLoadGears(EventCmd &e, vector<string> &check_cmd) ;
+    void processUpgradeGear(EventCmd &e, vector<string> &check_cmd) ;
     
     void sendErrorResponse(int fd,int cmd_code,int error_code);
     void sendErrorResponseFroPayment(int fd,int cmd_code,int error_code,string &tran_id);

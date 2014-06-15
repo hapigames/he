@@ -45,6 +45,10 @@ public:
     
     bool dhInitMysql();
     void closeDbConnection();
+
+    MYSQL_RES* getStoreResult(const char *sql);
+    int execSql(const char *sql);
+    long long execSqlReturnId(const char *sql);
     
     User * getUser(uid_type uid);
     Hero * getHero(User * user,long long hid);
@@ -82,7 +86,7 @@ public:
     bool loadAct(MYSQL_ROW &row,int mnf,User * user);
     bool loadAllTeams(User * user);
     bool loadTeam(MYSQL_ROW &row,int mnf,User * user);
-
+    
     bool saveUser(User * user);
     bool saveUserSInfo(User * user);
     bool saveUserTrialInfo(User *user);
@@ -126,7 +130,25 @@ public:
     void updateTrialRank(long long uid, int data, long long now);
     void saveTrialRank();
     void loadTrialRank();
-    
+ 
+    bool loadPvpAllBuildings(User *user);
+    bool loadUserPvpInfo(User *user);
+    void addUserPvpInfo(User *user);
+    void saveUserpvpInfo(User *user);
+    bool loadAllGears(User *user);
+    bool addGear(User *user, int mid);
+    void saveGear(User *user, GearInf &ginf);
+    bool loadPvpRankUids();
+    bool savePvpRank(long long uid, int rank);
+    long long  addBuilding(User * user, int mid,int position);
+    void saveBuilding(User *user, long long id, int position);
+    void saveBuilding(User *user, BuildInf &binf);
+    void destroyBuilding(User *user, long long bid);
+    void addRewardItem(User *user, vector <ItemConf> &items);
+    void delReqItem(User *user, vector <ItemConf> &items);
+    bool loadAllHonorExcStatus(User *user);
+    void saveHonorExcStatus(User *user, int index);
+   
     map<uid_type,User*> users_;
     MYSQL mysql_;
     //MYSQL_ROW row_;
@@ -142,10 +164,13 @@ public:
     int global_news_index_;
     int server_id_;
 
-    //TODO trial rank  
+    //trial rank  
     vector <RankItem> trial_ranks_;
     bool trial_rank_need_save_;
     long long trial_rank_last_save_time_;
+
+    //pvp 排行版uid
+    vector <long long> pvp_rank_uids_;
 
     log4cxx::LoggerPtr logger_;
     

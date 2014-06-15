@@ -53,7 +53,16 @@ User::User()
 
     trial_instant_start_time_ = 0;
     trial_daily_reset_ = 0;
+
+    honor_ = 0;
+    pvp_rank_ = 0;
+    pvp_attack_tuid_ = 0; 
+    pvp_attacked_tuid_ = 0;
+    pvp_team_id_ = 0;
+    wood_ = 0;
+    stone_ = 0;
 }
+
 User::~User()
 {
     for(map<long long , Hero* >::iterator it = heroes_.begin();
@@ -115,4 +124,28 @@ Team::Team()
 Team::~Team()
 {
     
+}
+
+int User::towerLevel() {
+    int level = 1;
+    for (map <long long, BuildInf>::iterator iter = build_infs_.begin(); iter != build_infs_.end(); ++iter) {
+        if (iter->second.mid_ == BUILDING_TOWER) {
+            level = iter->second.level_;
+            break;
+        }
+    }
+    return level;
+}
+
+bool User::checkBuildingPosiiton(int pos) {
+    //TODO
+    return true;
+}
+
+bool User::checkBuildingReqItem(vector <ItemConf> &reqitem) {
+    //TODO
+    return true;
+}
+
+void User::loadBuildingsPositions(vector <int> &poses) {
 }

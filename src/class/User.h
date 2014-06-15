@@ -10,6 +10,7 @@
 #define hero_User_h
 
 #include "../common/Const.h"
+#include "../common/GameConfig.h"
 #include <string>
 #include <map>
 #include <vector>
@@ -22,6 +23,8 @@
 #include "Mission.h"
 #include "Stage.h"
 #include "Act.h"
+#include "Build.h"
+
 using namespace std;
 
 class UserBasicInfo
@@ -35,6 +38,15 @@ public:
     string username_;
     string password_;
     long long create_time_;
+};
+
+class HonorExcInf {
+public:
+    HonorExcInf(int idx, int dc, int ac) : index_(idx), daily_exc_count_(dc), all_exc_count_(ac) {}
+    HonorExcInf(): index_(0), daily_exc_count_(0), all_exc_count_(0) {}
+    int index_;
+    int daily_exc_count_;
+    int all_exc_count_;
 };
 
 class Team
@@ -56,6 +68,12 @@ class User
 public:
     User();
     ~User();
+
+    bool loadStatus(int status) { return (load_staus_ & status) != 0; }
+    int  towerLevel();
+    bool checkBuildingPosiiton(int pos);
+    bool checkBuildingReqItem(vector <ItemConf> &reqitem);
+    void loadBuildingsPositions(vector <int> &poses);
     
     uid_type uid_;//0
     string nick_name_;//1
@@ -79,11 +97,11 @@ public:
     int receive_energy_daily_limit_;
     int send_energy_daily_limit_;
 
-    //TODO
     int trial_stage_id_; //28
     int trial_max_stage_id_; //29
     int trial_daily_reset_; //30
     long long trial_instant_start_time_; //31
+    int honor_; //32
 
     
     vector<int> system_mail_record_;
@@ -115,6 +133,18 @@ public:
     int battle_stage_id_;
     uid_type assistant_id_;
     vector<StageReward * > rewards_;
+
+    //pvp 基地
+    int pvp_rank_;
+    long long pvp_attack_tuid_; //正攻打的uid
+    long long pvp_attacked_tuid_;//正在被谁攻打
+    long long pvp_team_id_;
+    int wood_;
+    int stone_;
+
+    map <long long, BuildInf> build_infs_;
+    map <long long, GearInf> gear_infs_;
+    map <int, HonorExcInf> honor_exc_infs_;
     
     int military;
     

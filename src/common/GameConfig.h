@@ -50,6 +50,51 @@ struct sconfig{
     string pay_db_name;
     int pay_db_port;
 };
+
+class GearConf {
+public:
+    GearConf():mid_(0),star_(0),position_(0) {}
+    int mid_;
+    int star_;
+    int position_;
+};
+
+class ItemConf {
+public:
+    ItemConf(): type_(0), subtype_(0), amount_(0) {}
+    int type_;
+    int subtype_;
+    int amount_;
+};
+
+class BuildConf {
+public:
+    BuildConf() :mid_(0), req_user_level_(0), req_tower_level_(0) {}
+    int mid_;
+    int req_user_level_;
+    int req_tower_level_; //主基地等级 当mid不是主基地时才有效
+    vector <ItemConf> req_items_;
+    vector <ItemConf> reward_items_;
+};
+
+class HonorExcConf {
+public:
+    HonorExcConf() : index_(0), mid_(0), req_user_level_(0), req_honor_(0), daily_exc_limit_(0), all_exc_limit_(0) {}
+    int index_;
+    int mid_;
+    int req_user_level_;
+    int req_honor_;
+    int daily_exc_limit_;
+    int all_exc_limit_;
+};
+
+class GemConf {
+public:
+    int mid_;
+    int req_gold_;
+    int req_diamond_;
+};
+
 class GameConfig
 {
 public:
@@ -221,7 +266,29 @@ public:
     
     map<int,ActConfig *> act_config_;
     
-    
+    //pvp conf
+    //gear :mid. start 1
+    vector <GearConf> gear_conf_;
+    //:position,star,enhance
+    vector <vector <vector <int> > > gear_enhance_req_gold_;
+    vector <vector <vector <int> > > gear_sell_gold_;
+    //build :mid,level start 1 //到多少等级需要的配置
+    vector <vector <BuildConf> > build_conf_;
+    //honor exc: index
+    vector <HonorExcConf> honor_exc_conf_;
+    //rank 全服排行版大小
+    int pvp_rank_list_size_; 
+    //自己在排行版周围的情况
+    int pvp_owner_ranks_size_; 
+    int pvp_owner_rank_forward_cnt_;
+    int pvp_owner_rank_backward_cnt_;
+    vector <int> pvp_owner_rank_range_;
+    vector <int> pvp_owner_rank_step_;
+    //plunder
+    //待定
+    //gem :mid, start 1
+    vector <GemConf> gem_conf_;
+
     //util
     void readIntVectorFillZero(vector<int> &v,Setting & st,const char * name);
     void readReward(Reward &rew,Setting &st);
@@ -245,8 +312,7 @@ public:
 
     int  rewardCombine(int type);
     void insertRewardStage(vector <StageReward> &rewards, StageReward &sr);
-    
-    
+
     /////////////////////////////////////////////////
     vector<int> act_2_level_;
     vector< vector<StageReward> > act_2_reward_;

@@ -2338,16 +2338,22 @@ bool DataHandler::getUserPvpRank(User *user) {
             break;
         }
     }
-    user->pvp_rank_ = rank;
-
     if (user->user_level_ < game_config.pvp_req_user_level_) {
         return true;
     }
+
+    user->pvp_rank_ = rank;
 
     if (user->pvp_rank_ > 0) {
         return true;
     }
     addPvpRank(user);
+
+    //TODO 加入排行版以后 系统送一点资源
+    user->wood_ += game_config.pvp_init_wood_;
+    user->stone_ += game_config.pvp_init_stone_;
+
+    addUserPvpInfo(user); 
 
     LOG4CXX_DEBUG(logger_, "get user_pvp_rank , uid:"<<user->uid_<<" rank:"<<user->pvp_rank_<<" succ:"<<db_error_);
 
@@ -2362,6 +2368,10 @@ void DataHandler::addBuildingRewardItem(User *user, vector <Reward> &items) {
         switch(items[i].type) {
             case ITEM_TYPE_GOLD:
                 user->gold_ += items[i].param_1;
+                check = saveUser(user);
+                break;
+            case ITEM_TYPE_DIAMOND:
+                user->diamond_ += items[i].param_1;
                 check = saveUser(user);
                 break;
             case ITEM_TYPE_WOOD:
@@ -2390,6 +2400,10 @@ void DataHandler::delBuildingReqItem(User *user, vector <Reward> &items) {
         switch(items[i].type) {
             case ITEM_TYPE_GOLD:
                 user->gold_ -= items[i].param_1;
+                check = saveUser(user);
+                break;
+            case ITEM_TYPE_DIAMOND:
+                user->diamond_ -= items[i].param_1;
                 check = saveUser(user);
                 break;
             case ITEM_TYPE_WOOD:

@@ -190,6 +190,7 @@ bool User::checkBuildingPosiiton(int pos) {
 //TODO 暂时只需要消耗gold,wood,stone 要求其他需要改代码
 bool User::checkBuildingReqItem(vector <Reward> &reqitem) {
     int req_gold = 0;
+    int req_diamond = 0;
     int req_wood = 0;
     int req_stone = 0;
     bool ret = true;
@@ -197,6 +198,9 @@ bool User::checkBuildingReqItem(vector <Reward> &reqitem) {
         switch(reqitem[i].type) {
             case ITEM_TYPE_GOLD:
                 req_gold += reqitem[i].param_1;
+                break;
+            case ITEM_TYPE_DIAMOND:
+                req_diamond += reqitem[i].param_1;
                 break;
             case ITEM_TYPE_WOOD:
                 req_wood += reqitem[i].param_1;
@@ -211,6 +215,7 @@ bool User::checkBuildingReqItem(vector <Reward> &reqitem) {
     }
 
     if (gold_ < req_gold
+            || diamond_ < req_diamond
             || wood_ < req_wood
             || stone_ < req_stone) {
         ret = false;

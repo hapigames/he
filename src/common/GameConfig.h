@@ -315,6 +315,9 @@ public:
     int pvp_rob_attack_daily_limit_;
     int pvp_rank_attack_daily_limit_;
 
+    int pvp_init_wood_;
+    int pvp_init_stone_;
+
 
     //util
     void readIntVectorFillZero(vector<int> &v,Setting & st,const char * name);

@@ -270,15 +270,18 @@ void EventHandler::processLoadPvpLootTargets(EventCmd &e, vector <string> &check
         //user 
         vector <int> pos;
         for (int i = start; i <= end; i++) {
+            if (dh_->pvp_rank_uids_[i] == uid) {
+                continue;
+            }
             pos.push_back(i);
         }
         for (int i = 0; i < game_config.rob_player_num_; i++) {
             if (i >= (int)pos.size()) {
                 break;
             }
-            int idx = rand()%game_config.rob_player_num_;
-            rankids.push_back(pos[idx]);
-            pos[idx] = pos[i];
+            int idx = rand() % (int)(pos.size()-i);
+            rankids.push_back(pos[idx+i]);
+            pos[idx+i] = pos[i];
         }
         //TODO robot
     }
@@ -453,7 +456,7 @@ void EventHandler::processAddBuilding(EventCmd &e, vector<string> &check_cmd) {
         succ = ERROR_BUILDING_POSITION_ERROR;
     }
     else if (!user->checkBuildingReqItem(game_config.build_conf_[mid][1].req_items_)) {
-        succ = ERROR_BUILDING_GEAR_NOT_ENOUGH;
+        succ = ERROR_BUILDING_ITEM_NOT_ENOUGH;
     }
     else {
         id = dh_->addBuilding(user, mid, position);
@@ -586,7 +589,7 @@ void EventHandler::processUpgradeBuilding(EventCmd &e, vector<string> &check_cmd
             succ = ERROR_TOWER_LEVEL_NOT_ENOUGH;
         }
         else if (!user->checkBuildingReqItem(game_config.build_conf_[binf.mid_][binf.level_+1].req_items_)) {
-            succ = ERROR_BUILDING_GEAR_NOT_ENOUGH;
+            succ = ERROR_BUILDING_ITEM_NOT_ENOUGH;
         }
         else {
             binf.level_ ++;

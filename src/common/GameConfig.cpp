@@ -118,15 +118,14 @@ bool GameConfig::loadFromFile()
         rob_stone_percent_ = sys_config["rob_stone_percent"];
         pvp_win_honor_ = sys_config["pvp_win_honor"];
         pvp_lose_honor_ = sys_config["pvp_lose_honor"];
-
-        //TODO
-        pvp_load_rank_size_ = 10;
-        pvp_rank_attack_before_ = 5;
-        pvp_rank_attack_after_ = 4;
-        pvp_req_user_level_ = 3;
-
-        pvp_rank_attack_daily_limit_ = 10;
-        pvp_rob_attack_daily_limit_ = 10;
+        pvp_load_rank_size_ = sys_config["pvp_load_rank_size"];
+        pvp_rank_attack_before_ = sys_config["pvp_rank_attack_before"];
+        pvp_rank_attack_after_ = sys_config["pvp_rank_attack_after"];
+        pvp_req_user_level_ = sys_config["pvp_req_user_level"];
+        pvp_rank_attack_daily_limit_ = sys_config["pvp_rank_attack_daily_limit"];
+        pvp_rob_attack_daily_limit_ = sys_config["pvp_rob_attack_daily_limit"];
+        pvp_init_wood_ = sys_config["pvp_init_wood"];
+        pvp_init_stone_ = sys_config["pvp_init_stone"];
 
         time_area_fix_ = 1391270400LL;
         energy_price_.clear();
@@ -740,7 +739,7 @@ bool GameConfig::loadFromFile()
 
         pvp_rank_interval_range_.clear();
         pvp_rank_interval_.clear();
-        readIntVector(pvp_rank_interval_range_, st["pvp_rank_interval"], "start");
+        readIntVector(pvp_rank_interval_range_, st["pvp_rank_interval"], "end");
         readIntVector(pvp_rank_interval_, st["pvp_rank_interval"], "interval");
 
         readIntVector(pvp_rank_reward_id_, st["pvp_rank_reward"], "id");

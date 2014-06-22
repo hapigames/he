@@ -40,14 +40,21 @@ void GameMaster::run()
         LOG4CXX_ERROR(logger_,"system;Data handler failed to connect to db,exit!");
         exit(1);
     }
+    
+    eh_->dh_->loadTrialRank();
+    eh_->dh_->loadPvpRankUids();
+
     vector<EventCmd> event_cmds;
+
     for(;;){
+        long long now = time(NULL);
+        eh_->now_time_ = now;
+
         if(eh_->dh_->db_error_ != 0){
             eh_->dh_->closeDbConnection();
             LOG4CXX_ERROR(logger_,"system;Data handler close connection to db!");
         }
         if(eh_->dh_->dbc_open_ == false){
-            long long now = time(NULL);
             if(now - db_reconnect_time_ >= 60){
                 if(eh_->dh_->dhInitMysql() == false){
                     LOG4CXX_ERROR(logger_,"system;Data handler failed to reconnect to db!");

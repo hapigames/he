@@ -165,6 +165,13 @@ void *gamethread_main(void * arg)
 
 int main(int argc, const char * argv[])
 {
+    if (argc < 2) {
+        cout<<" Usage:\n";
+        cout<<"      "<<argv[0]<<" serverid\n";
+        cout<<"      VERSION: ";
+        cout<<__DATE__<<" "<<__TIME__<<endl;
+        return 1;
+    }
     server_id = atoi(argv[1]);
     //server_id = 1;
     cout<<server_id<<endl;

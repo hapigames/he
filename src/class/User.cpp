@@ -8,6 +8,8 @@
 
 #include "User.h"
 
+extern GameConfig game_config;
+
 UserBasicInfo::UserBasicInfo()
 {
 }
@@ -56,11 +58,14 @@ User::User()
 
     honor_ = 0;
     pvp_rank_ = 0;
+    pvp_attack_type_ = 0;
     pvp_attack_tuid_ = 0; 
     pvp_attacked_tuid_ = 0;
     pvp_team_id_ = 0;
     wood_ = 0;
     stone_ = 0;
+    pvp_rank_attack_count_ = pvp_rob_attack_count_ = 0;
+    pvp_attack_start_time_ = time(NULL);
 }
 
 User::~User()
@@ -126,6 +131,32 @@ Team::~Team()
     
 }
 
+BuildInf *User::towerInf() {
+    BuildInf *binf = NULL;
+    for (map <long long, BuildInf>::iterator iter = build_infs_.begin(); iter != build_infs_.end(); ++iter) {
+        if (iter->second.mid_ == BUILDING_TOWER) {
+            binf = &(iter->second);
+        }
+    }
+    return binf;
+}
+
+Team *User::getTeam(long long teamid) {
+    map <long long, Team *>::iterator iter = teams_.find(teamid);
+    if (iter != teams_.end()) {
+        return (iter->second);
+    }
+    return NULL;
+}
+Hero *User::getHero(long long heroid) {
+    map <long long, Hero *>::iterator iter = heroes_.find(heroid);
+    if (iter != heroes_.end()) {
+        return (iter->second);
+    }
+    return NULL;
+}
+
+
 int User::towerLevel() {
     int level = 1;
     for (map <long long, BuildInf>::iterator iter = build_infs_.begin(); iter != build_infs_.end(); ++iter) {
@@ -137,15 +168,78 @@ int User::towerLevel() {
     return level;
 }
 
-bool User::checkBuildingPosiiton(int pos) {
-    //TODO
-    return true;
+bool User::hadBuilding(int pos) {
+    for (map <long long, BuildInf>::iterator iter = build_infs_.begin(); iter != build_infs_.end(); ++iter) {
+        if (iter->second.position_ == pos) {
+            return true;
+        }
+    }
+    return false;
 }
 
-bool User::checkBuildingReqItem(vector <ItemConf> &reqitem) {
-    //TODO
-    return true;
+bool User::checkBuildingPosiiton(int pos) {
+    BuildInf *binf = towerInf();
+    if (binf != NULL
+            && game_config.checkInVector(game_config.build_conf_[binf->mid_][binf->level_].positions_, pos)
+            && !hadBuilding(pos) ) {
+        return true;
+    }
+    return false;
+}
+
+//TODO 暂时只需要消耗gold,wood,stone 要求其他需要改代码
+bool User::checkBuildingReqItem(vector <Reward> &reqitem) {
+    int req_gold = 0;
+    int req_wood = 0;
+    int req_stone = 0;
+    bool ret = true;
+    for (size_t i = 0; i < reqitem.size(); i++) {
+        switch(reqitem[i].type) {
+            case ITEM_TYPE_GOLD:
+                req_gold += reqitem[i].param_1;
+                break;
+            case ITEM_TYPE_WOOD:
+                req_wood += reqitem[i].param_1;
+                break;
+            case ITEM_TYPE_STONE:
+                req_stone += reqitem[i].param_1;
+                break;
+            default:
+                ret = false;
+                break;
+        }
+    }
+
+    if (gold_ < req_gold
+            || wood_ < req_wood
+            || stone_ < req_stone) {
+        ret = false;
+    }
+    return ret;
 }
 
 void User::loadBuildingsPositions(vector <int> &poses) {
+    for (map <long long, BuildInf>::iterator iter = build_infs_.begin(); iter != build_infs_.end(); iter++) {
+        if (iter->second.mid_ != BUILDING_TOWER) {
+            if ((int) poses.size() <= iter->second.position_) {
+                poses.resize(iter->second.position_+1, 0);
+            }
+            poses[iter->second.position_] = 1;
+        }
+    }
 }
+
+void User::dateChange() {
+    pvp_rank_attack_count_ = pvp_rob_attack_count_ = 0;
+}
+
+bool User::canAttack(time_t now) {
+    if (now >= pvp_attack_start_time_ + 600) {
+        pvp_attack_type_ = 0;
+        pvp_attack_tuid_ = 0;
+        pvp_attacked_tuid_ = 0;
+        pvp_attack_start_time_ = now;
+    }
+    return pvp_attacked_tuid_ == 0;
+}
+

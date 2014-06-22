@@ -49,7 +49,6 @@ DataHandler::~DataHandler()
 }
 bool DataHandler::dhInitMysql()
 {
-    loadTrialRank();
 
     sconfig * sc = game_config.getSconfig(server_id_);
     if(sc == NULL) return false;
@@ -65,8 +64,10 @@ bool DataHandler::dhInitMysql()
         mysql_options(&mysql_, MYSQL_OPT_RECONNECT, &opt_val);
         dbc_open_ =true;
         db_error_ = 0;
-        return true;
+        //return true;
     }
+    //loadPvpRankUids();
+    return true;
 }
 void DataHandler::closeDbConnection()
 {
@@ -101,7 +102,8 @@ long long DataHandler::execSqlReturnId(const char *sql) {
 }
 
 int DataHandler::execSql(const char *sql) {
-    return mysql_query(&mysql_, sql);
+    db_error_ =  mysql_query(&mysql_, sql);
+    return db_error_;
 }
 
 
@@ -1106,6 +1108,7 @@ bool DataHandler::createUser(uid_type uid, vector<string> &param)
         db_error_ = ret;
         return false;
     }
+
     return true;
 }
 bool DataHandler::saveUser(User * user)
@@ -2025,7 +2028,7 @@ bool DataHandler::loadPvpAllBuildings(User *user) {
     LOG4CXX_DEBUG(logger_,  "try to load builds from db for user"<<user->uid_);
     bool ret = false;
     char sql[1024];
-    sprintf(sql, "select id,owner_uid,type,level,position,gem_type from building_info where owner_id = '%lld';", user->uid_);
+    sprintf(sql, "select id,owner_uid,mid,level,position,gem_type from building_info where owner_uid = '%lld';", user->uid_);
     int err = 0; 
     if((err = mysql_query(&mysql_, sql)) == 0){
         //先清空
@@ -2048,15 +2051,88 @@ bool DataHandler::loadPvpAllBuildings(User *user) {
             }
         }
         mysql_free_result(res);
+        user->setStatus(LOADED_BUILDINGS);
         ret = true; 
     }
+    //检查是否有主基地
+    if (user->towerInf() == NULL) {
+        long long bid = addBuilding(user, BUILDING_TOWER, 0);
+        LOG4CXX_INFO(logger_, "addbuilding tower, uid:"<<user->uid_<<" bid:"<<bid);
+    }
+
     LOG4CXX_DEBUG(logger_,"read buildings for "<<user->uid_<<" succ:"<<err);
     db_error_ = err;
     return ret; 
 }
 
+long long DataHandler::addBuilding(User * user, int mid,int position) {
+    LOG4CXX_DEBUG(logger_, "try to addbuilding ,uid:"<<user->uid_<<", mid:"<<mid<<" position:"<<position);
+    long long bid = -1;
+    if (mid == BUILDING_TOWER) {
+        for (map <long long, BuildInf>::iterator iter = user->build_infs_.begin(); iter != user->build_infs_.end(); ++iter) {
+            if (iter->second.mid_ == mid) {
+                return bid;
+            }
+        }
+    }
+    db_error_ = 0;
+    char sql[1024];
+    //id,owner_uid,type,level,position,gem_type
+    sprintf(sql, "insert into building_info(`owner_uid`,`mid`,`level`,`position`,`gem_type`) values "\
+            "('%lld', '%d', '1', '%d', '0');",
+            user->uid_, mid, position);
+    int ret = mysql_query(&mysql_, sql);
+    if (ret == 0) {
+        bid = mysql_insert_id(&mysql_);
+        user->build_infs_.insert(make_pair(bid, BuildInf(bid, user->uid_,1,mid,position,0)));
+    }
+    else {
+        db_error_ = ret;
+        LOG4CXX_ERROR(logger_, "addbuilding failed, uid"<<user->uid_<<" mid:"<<mid<<" succ:"<<db_error_);
+    }
+    return bid;
+}
+
+void DataHandler::saveBuilding(User *user, long long id, int position) {
+    LOG4CXX_DEBUG(logger_, "try to save building, uid:"<<user->uid_);
+    map <long long, BuildInf>::iterator iter = user->build_infs_.find(id);
+    if (iter == user->build_infs_.end()) {
+        LOG4CXX_ERROR(logger_, "save building error not found id:"<<id<<" uid:"<<user->uid_<<" pos:"<<position);
+    }
+    iter->second.position_ = position;
+
+    char sql[1024];
+    sprintf(sql, "update building_info set `position`='%d' where `id`='%lld';", position, id);
+    if (execSql(sql)) {
+        LOG4CXX_ERROR(logger_, "save building error, uid:"<<user->uid_<<" succ:"<<db_error_);
+    }
+    LOG4CXX_DEBUG(logger_, "save building, uid:"<<user->uid_<<" id:"<<id<<" pos:"<<position<<" succ:"<<db_error_);
+}
+
+void DataHandler::saveBuilding(User *user, BuildInf &binf) {
+    LOG4CXX_DEBUG(logger_, "try to save building, uid:"<<user->uid_);
+    char sql[1024];
+    sprintf(sql, "update building_info set `level`='%d', `position`='%d', `gem_type`='%d' where `id`='%lld';", binf.level_, binf.position_, binf.gem_type_, binf.id_);
+    if (execSql(sql)) {
+        LOG4CXX_ERROR(logger_, "save building error, uid:"<<user->uid_<<" succ:"<<db_error_);
+    }
+}
+
+void DataHandler::destroyBuilding(User *user, long long bid) {
+    LOG4CXX_DEBUG(logger_, "try to destory building, uid:"<<user->uid_);
+    char sql[1024];
+    sprintf(sql, "delete from building_info where `id`='%lld';", bid);
+    if (execSql(sql)) {
+        LOG4CXX_ERROR(logger_, "destroy building error, uid:"<<user->uid_<<" succ:"<<db_error_);
+    }
+    else {
+        user->build_infs_.erase(bid);
+        //TODO
+    }
+}
+
 bool DataHandler::loadUserPvpInfo(User *user) {
-    LOG4CXX_DEBUG(logger_, "try to load user pvp_info from db for user:"<<user->uid_);
+    LOG4CXX_DEBUG(logger_, "try to load user_pvp_info from db for user:"<<user->uid_);
     bool ret = false;
     char sql[1024];
     sprintf(sql, "select `team_id`,`wood`,`stone`,`attack_tuid`,`attacked_tuid` from `user_pvp_info` where `uid`='%lld';", user->uid_);
@@ -2084,40 +2160,45 @@ bool DataHandler::loadUserPvpInfo(User *user) {
             need_add = 1;
         }
         mysql_free_result(res);
+        ret = true;
+    }
 
-        if (need_add) {
-            addUserPvpInfo(user);
-        }
-    }
-    else {
-        addUserPvpInfo(user);
-    }
+    getUserPvpRank(user);
+
     LOG4CXX_DEBUG(logger_, "read user_pvp_info for "<<user->uid_<<" succ:"<<err);
     db_error_ = err;
     return ret;
 }
 
-void DataHandler::addUserPvpInfo(User *user) {
+bool DataHandler::addUserPvpInfo(User *user) {
+    bool ret = true;
+    LOG4CXX_DEBUG(logger_, "try to add user_pvp_info, uid:"<<user->uid_);
     char sql[1024];
-    sprintf(sql, "insert into user_pvp_info name(uid, team_id, wood, stone, attack_tuid, attacked_tuid) "\
-            " values('%lld', '%lld', '%d', '%d', '%lld', '%lld');",
-            user->uid_, user->pvp_team_id_, user->wood_, user->stone_, user->pvp_attack_tuid_, user->pvp_attacked_tuid_);
-    if (execSql(sql)) {
-        LOG4CXX_ERROR(logger_, "pvp_rank_info: add, uid:"<<user->uid_<<" succ:"<<db_error_);
+    sprintf(sql, "insert into user_pvp_info(uid, team_id, wood, stone, attack_tuid, attacked_tuid, attack_type) "\
+            " values('%lld', '%lld', '%d', '%d', '%lld', '%lld', '%d') ON DUPLICATE KEY update team_id='%lld', wood='%d', stone='%d',"\
+            " attack_tuid='%lld', attacked_tuid='%lld', attack_type='%d';",
+            user->uid_, user->pvp_team_id_, user->wood_, user->stone_, user->pvp_attack_tuid_, user->pvp_attacked_tuid_, user->pvp_attack_type_,
+            user->pvp_team_id_, user->wood_, user->stone_, user->pvp_attack_tuid_, user->pvp_attacked_tuid_, user->pvp_attack_type_);
+    if (execSql(sql) != 0) {
+        LOG4CXX_ERROR(logger_, "add user_pvp_info error, uid:"<<user->uid_<<" succ:"<<db_error_);
+        ret = false;
     }
-    LOG4CXX_DEBUG(logger_, "pvp_rank_info: add, uid:"<<user->uid_);
+    LOG4CXX_DEBUG(logger_, sql);
+    LOG4CXX_DEBUG(logger_, "add user_pvp_info, uid:"<<user->uid_<<" succ:"<<db_error_);
+    return ret;
 }
 
-void DataHandler::saveUserpvpInfo(User *user) {
+//TODO 都调用addUserPvpInfo
+bool DataHandler::saveUserPvpInfo(User *user) {
     char sql[1024];
-    sprintf(sql, "update `user_pvp_info` set `team_id`='%lld', `wood`='%d', `stone`='%d', `attack_tuid`='%lld', ``attacked_tuid`='%lld' where `uid`='%lld';",
-            user->pvp_team_id_, user->wood_, user->stone_, user->pvp_attack_tuid_, user->pvp_attacked_tuid_, user->uid_);
+    sprintf(sql, "update `user_pvp_info` set `team_id`='%lld', `wood`='%d', `stone`='%d', `attack_tuid`='%lld', ``attacked_tuid`='%lld',`attack_type`='%d' where `uid`='%lld';",
+            user->pvp_team_id_, user->wood_, user->stone_, user->pvp_attack_tuid_, user->pvp_attacked_tuid_, user->pvp_attack_type_, user->uid_);
     int ret = execSql(sql);
     if (ret != 0) {
-        LOG4CXX_ERROR(logger_, "save pvp_rank_info uid:"<<user->uid_<<" succ:"<<db_error_);
+        LOG4CXX_ERROR(logger_, "save user_pvp_info uid:"<<user->uid_<<" succ:"<<db_error_);
     }
-    LOG4CXX_DEBUG(logger_, "save pvp_rank_info, uid:"<<user->uid_);
-
+    LOG4CXX_DEBUG(logger_, "save user_pvp_info, uid:"<<user->uid_);
+    return ret == 0;
 }
 
 bool DataHandler::loadAllGears(User *user) {
@@ -2143,6 +2224,8 @@ bool DataHandler::loadAllGears(User *user) {
         }
 
         mysql_free_result(res);
+        ret = true;
+        user->setStatus(LOADED_GEARS);
     }
     else {
         LOG4CXX_ERROR(logger_, "loadgear res failed, uid:"<<user->uid_);
@@ -2181,24 +2264,33 @@ bool DataHandler::loadPvpRankUids() {
     LOG4CXX_DEBUG(logger_, "try to load pvp rank uids from db");
     bool ret = false;
     char sql[256];
-    sprintf(sql, "select uid,rank from pvp_rank_info order by rank ASC;");
+    sprintf(sql, "select rankid,uid from pvp_rank_info order by rankid ASC;");
     int err = 0;
     if ((err = mysql_query(&mysql_, sql)) == 0) {
         pvp_rank_uids_.clear();
         MYSQL_RES *res = mysql_store_result(&mysql_);
-        MYSQL_ROW row;
-        while ((row = mysql_fetch_row(res))) {
-            long long uid;
-            int rank;
-            if (safeAtoll(row[0], uid)
-                    && safeAtoi(row[1], rank)) {
-                pvp_rank_uids_.push_back(uid);
-                if (rank != (int)pvp_rank_uids_.size()) {
-                    LOG4CXX_ERROR(logger_, "read pvp_rank_info uid:"<<uid<<" rank:"<<rank<<" error");
+        if (res) {
+            int num = mysql_num_fields(res);
+            if (num > 0) {
+                pvp_rank_uids_.resize(num+1);
+            }
+            MYSQL_ROW row;
+            while ((row = mysql_fetch_row(res))) {
+                long long uid;
+                int rankid;
+                if (safeAtoi(row[0], rankid)
+                        && safeAtoll(row[1], uid)) {
+                    if ((int)pvp_rank_uids_.size() <= rankid) {
+                        pvp_rank_uids_.resize(rankid+1, 0);
+                    }
+                    pvp_rank_uids_[rankid] = uid;
                 }
             }
+            mysql_free_result(res);
         }
-        mysql_free_result(res);
+        else {
+            LOG4CXX_ERROR(logger_, "load pvp_rank_info error, succ:"<<err);
+        }
         ret = true;
     }
     LOG4CXX_DEBUG(logger_, "read pvp_rank_info succ:"<<err);
@@ -2206,78 +2298,159 @@ bool DataHandler::loadPvpRankUids() {
     return ret;
 }
 
-bool DataHandler::savePvpRank(long long uid, int rank) {
+bool DataHandler::addPvpRank(User *user) {
+    LOG4CXX_DEBUG(logger_, "try to add pvprank, uid:"<<user->uid_);
     char sql[256];
-    sprintf(sql, "insert into pvp_rank_info(`uid`, `rank`) values('%lld', '%d') on duplicate key update `rank`='%d';", uid, rank, rank);
+    sprintf(sql, "insert into pvp_rank_info(`uid`) values('%lld');", user->uid_);
+    int id = (int) execSqlReturnId(sql);
+    if (id <= 0) {
+        LOG4CXX_ERROR(logger_, "addPvpRank failed, uid:"<<user->uid_);
+        return false;
+    }
+    else {
+        user->pvp_rank_ = id;
+        if (pvp_rank_uids_.size() == 0) {
+            pvp_rank_uids_.push_back(0);
+        }
+        pvp_rank_uids_.push_back(user->uid_);
+        if (id != (int)pvp_rank_uids_.size() - 1) {
+            LOG4CXX_ERROR(logger_, "addPvpRank error, uid:"<<user->uid_<<" rank:"<<user->pvp_rank_);
+        }
+
+        LOG4CXX_INFO(logger_, "addPvpRank, uid:"<<user->uid_<<" rank:"<<user->pvp_rank_);
+    }
+    return true;
+}
+
+bool DataHandler::savePvpRank(int rankid, long long uid) {
+    char sql[256];
+    sprintf(sql, "update pvp_rank_info set `uid`='%lld' where `rankid`='%d';", uid, rankid);
     int ret = execSql(sql);
     LOG4CXX_DEBUG(logger_, "save pvp_rank_info succ:"<<db_error_);
     return ret == 0? true:false;
 }
 
-long long DataHandler::addBuilding(User * user, int mid,int position) {
-    long long bid = -1;
-    db_error_ = 0;
-    char sql[1024];
-    //id,owner_uid,type,level,position,gem_type
-    printf(sql, "insert into building_info(`owner_uid`,`type`,`level`,`position`,`gem_type`) values "\
-            "('%lld', '%d', '1', '%d', '0');",
-            user->uid_, mid, position);
-    int ret = mysql_query(&mysql_, sql);
-    if (ret == 0) {
-        bid = mysql_insert_id(&mysql_);
-        user->build_infs_.insert(make_pair(bid, BuildInf(bid, user->uid_,1,mid,position,0)));
+bool DataHandler::getUserPvpRank(User *user) {
+    int rank = 0;
+    for (size_t i = 1; i < pvp_rank_uids_.size(); i++) {
+        if (pvp_rank_uids_[i] == user->uid_) {
+            rank = i;
+            break;
+        }
     }
-    else {
-        db_error_ = ret;
+    user->pvp_rank_ = rank;
+
+    if (user->user_level_ < game_config.pvp_req_user_level_) {
+        return true;
     }
-    return bid;
-}
 
-void DataHandler::saveBuilding(User *user, long long id, int position) {
-    LOG4CXX_DEBUG(logger_, "try to save building, uid:"<<user->uid_);
-    char sql[1024];
-    sprintf(sql, "update building_info set `position`='%d' where `id`='%lld';", position, user->uid_);
-    if (execSql(sql)) {
-        LOG4CXX_ERROR(logger_, "save building error, uid:"<<user->uid_<<" succ:"<<db_error_);
+    if (user->pvp_rank_ > 0) {
+        return true;
     }
-}
+    addPvpRank(user);
 
-void DataHandler::saveBuilding(User *user, BuildInf &binf) {
-    LOG4CXX_DEBUG(logger_, "try to save building, uid:"<<user->uid_);
-    char sql[1024];
-    sprintf(sql, "update building_info set `level`='%d', `position`='%d', `gem_type`='%d' where `id`='%lld';", binf.level_, binf.position_, binf.gem_type_, binf.id_);
-    if (execSql(sql)) {
-        LOG4CXX_ERROR(logger_, "save building error, uid:"<<user->uid_<<" succ:"<<db_error_);
-    }
-}
-
-void DataHandler::destroyBuilding(User *user, long long bid) {
-    LOG4CXX_DEBUG(logger_, "try to destory building, uid:"<<user->uid_);
-    char sql[1024];
-    sprintf(sql, "delete from building_info where `id`='%lld';", bid);
-    if (execSql(sql)) {
-        LOG4CXX_ERROR(logger_, "destroy building error, uid:"<<user->uid_<<" succ:"<<db_error_);
-    }
-    else {
-        user->build_infs_.erase(bid);
-        //TODO
-    }
-}
-
-void DataHandler::addRewardItem(User *user, vector <ItemConf> &items) {
-
-}
-
-void DataHandler::delReqItem(User *user, vector <ItemConf> &items) {
-
-}
-
-bool DataHandler::loadAllHonorExcStatus(User *user) {
+    LOG4CXX_DEBUG(logger_, "get user_pvp_rank , uid:"<<user->uid_<<" rank:"<<user->pvp_rank_<<" succ:"<<db_error_);
 
     return true;
 }
 
-void DataHandler::saveHonorExcStatus(User *user, int index) {
+void DataHandler::addBuildingRewardItem(User *user, vector <Reward> &items) {
+
+    LOG4CXX_DEBUG(logger_, "try to add building reward items, uid:"<<user->uid_);
+    for (size_t i = 0; i < items.size(); i++) {
+        bool check = false;
+        switch(items[i].type) {
+            case ITEM_TYPE_GOLD:
+                user->gold_ += items[i].param_1;
+                check = saveUser(user);
+                break;
+            case ITEM_TYPE_WOOD:
+                user->wood_ += items[i].param_1;
+                check = addUserPvpInfo(user);
+                break;
+            case ITEM_TYPE_STONE:
+                user->stone_ += items[i].param_1;
+                check = addUserPvpInfo(user);
+                break;
+            default:
+                break;
+        }
+        if (!check) {
+            LOG4CXX_ERROR(logger_, "add building reward item failed, uid:"<<user->uid_<<" type:"<<items[i].type<<" subtype:"<<items[i].subtype<<" param_1:"<<items[i].param_1);
+        }
+    }
+
+}
+
+//TODO 暂时只写删除这几种
+void DataHandler::delBuildingReqItem(User *user, vector <Reward> &items) {
+    LOG4CXX_DEBUG(logger_, "try to del building req items, uid:"<<user->uid_);
+    for (size_t i = 0; i < items.size(); i++) {
+        bool check = false;
+        switch(items[i].type) {
+            case ITEM_TYPE_GOLD:
+                user->gold_ -= items[i].param_1;
+                check = saveUser(user);
+                break;
+            case ITEM_TYPE_WOOD:
+                user->wood_ -= items[i].param_1;
+                check = addUserPvpInfo(user);
+                break;
+            case ITEM_TYPE_STONE:
+                user->stone_ -= items[i].param_1;
+                check = addUserPvpInfo(user);
+                break;
+            default:
+                break;
+        }
+        if (!check) {
+            LOG4CXX_ERROR(logger_, "del building req item failed, uid:"<<user->uid_<<" type:"<<items[i].type<<" subtype:"<<items[i].subtype<<" param_1:"<<items[i].param_1);
+        }
+    }
+}
+
+bool DataHandler::loadAllHonorExcStatus(User *user) {
+    LOG4CXX_DEBUG(logger_, "try to load honor_exc_status uid:"<<user->uid_);
+    bool ret = false;
+    char sql[256];
+    sprintf(sql, "select `index`,`daily_cnt`,`all_cnt` from honor_exc_status where `uid`='%lld';", user->uid_);
+    MYSQL_RES * res = getStoreResult(sql);
+    if (res) {
+        MYSQL_ROW row;
+        //map <int, HonorExcInf> honor_exc_infs_
+        // HonorExcInf(int idx, int dc, int ac)
+        while((row = mysql_fetch_row(res))) {
+            int idx,dc,ac;
+            if (safeAtoi(row[0], idx)
+                    && safeAtoi(row[1], dc)
+                    && safeAtoi(row[2], ac)) {
+                user->honor_exc_infs_.insert(make_pair<int, HonorExcInf>(idx, HonorExcInf(idx, dc, ac)));
+            }
+            else {
+                LOG4CXX_ERROR(logger_, "read honor exc status error, uid:"<<user->uid_<<" idx:"<<row[0]);
+            }
+        }
+
+        mysql_free_result(res);
+        ret = true;
+        user->setStatus(LOADED_HONOR_EXC);
+    }
+    else {
+        LOG4CXX_ERROR(logger_, "load honor_exc_status failed, res is null, uid:"<<user->uid_);
+    }
+    LOG4CXX_DEBUG(logger_, "read honor_exc_status, uid:"<<user->uid_<<" succ:"<<db_error_);
+    return ret;
+}
+
+void DataHandler::saveHonorExcStatus(User *user, int index, int dc, int ac) {
+    LOG4CXX_DEBUG(logger_, "try to save honor_exc_status, uid:"<<user->uid_<<" idx:"<<index);
+    char sql[256];
+    sprintf(sql, "insert into honor_exc_status(`uid`, `index`, `daily_cnt`, `all_cnt`) values('%lld', '%d', '%d', '%d') ON DUPLICATE KEY update `daily_cnt`='%d', `all_cnt`='%d';",
+            user->uid_, index, dc, ac, dc, ac);
+    if (execSql(sql)) {
+        LOG4CXX_ERROR(logger_, "save honor_exc_status failed, uid:"<<user->uid_<<" idx:"<<index<<" daily_cnt:"<<dc<<" all_cnt:"<<ac<<" succ:"<<db_error_);
+    }
+    LOG4CXX_DEBUG(logger_, "save honor_exc_status, uid:"<<user->uid_<<" idx:"<<index<<" daily_cnt:"<<dc<<" all_cnt:"<<ac<<" succ:"<<db_error_);
 }
 
 

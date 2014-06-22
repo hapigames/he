@@ -133,21 +133,23 @@ public:
  
     bool loadPvpAllBuildings(User *user);
     bool loadUserPvpInfo(User *user);
-    void addUserPvpInfo(User *user);
-    void saveUserpvpInfo(User *user);
+    bool addUserPvpInfo(User *user);
+    bool saveUserPvpInfo(User *user);
     bool loadAllGears(User *user);
     bool addGear(User *user, int mid);
     void saveGear(User *user, GearInf &ginf);
     bool loadPvpRankUids();
-    bool savePvpRank(long long uid, int rank);
+    bool addPvpRank(User *user);
+    bool savePvpRank(int rankid, long long uid);
+    bool getUserPvpRank(User *user);
     long long  addBuilding(User * user, int mid,int position);
     void saveBuilding(User *user, long long id, int position);
     void saveBuilding(User *user, BuildInf &binf);
     void destroyBuilding(User *user, long long bid);
-    void addRewardItem(User *user, vector <ItemConf> &items);
-    void delReqItem(User *user, vector <ItemConf> &items);
+    void addBuildingRewardItem(User *user, vector <Reward> &items);
+    void delBuildingReqItem(User *user, vector <Reward> &items);
     bool loadAllHonorExcStatus(User *user);
-    void saveHonorExcStatus(User *user, int index);
+    void saveHonorExcStatus(User *user, int index, int dc, int ac);
    
     map<uid_type,User*> users_;
     MYSQL mysql_;

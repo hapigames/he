@@ -70,10 +70,18 @@ public:
     ~User();
 
     bool loadStatus(int status) { return (load_staus_ & status) != 0; }
+    void setStatus(int status) { load_staus_ |= status; }
     int  towerLevel();
+    BuildInf* towerInf();
+    Team *getTeam(long long teamid);
+    Hero *getHero(long long heroid);
+    bool hadBuilding(int pos);
     bool checkBuildingPosiiton(int pos);
-    bool checkBuildingReqItem(vector <ItemConf> &reqitem);
+    bool checkBuildingReqItem(vector <Reward> &reqitem);
     void loadBuildingsPositions(vector <int> &poses);
+
+    void dateChange();
+    bool canAttack(time_t now);
     
     uid_type uid_;//0
     string nick_name_;//1
@@ -136,11 +144,16 @@ public:
 
     //pvp 基地
     int pvp_rank_;
+    int pvp_attack_type_;
+    time_t pvp_attack_start_time_; //TODO 不用保存
     long long pvp_attack_tuid_; //正攻打的uid
     long long pvp_attacked_tuid_;//正在被谁攻打
     long long pvp_team_id_;
     int wood_;
     int stone_;
+    //TODO 还没入库
+    int pvp_rank_attack_count_;
+    int pvp_rob_attack_count_;
 
     map <long long, BuildInf> build_infs_;
     map <long long, GearInf> gear_infs_;

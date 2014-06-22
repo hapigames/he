@@ -289,6 +289,57 @@ void EventHandler::handle(EventCmd &event)
         case CMD_TRIAL_RELIVE:
             processTrialRelive(event, check_cmd);
             break;
+        case CMD_LOAD_BUILDINGS:
+            processLoadbuildings(event, check_cmd);
+            break;
+        case CMD_LOAD_BUILDINGS_BY_ID:
+            processLoadBuildingsById(event, check_cmd);
+            break;
+        case CMD_LOAD_PVP_RANKS:
+            processLoadPvpRanks(event, check_cmd);
+            break;
+        case CMD_LOAD_PVP_TARGETS:
+            processLoadPvpTargets(event, check_cmd);
+            break;
+        case CMD_LOAD_PVP_LOOT_TARGETS:
+            processLoadPvpLootTargets(event, check_cmd);
+            break;
+        case CMD_PVP_BATTLE_START:
+            processPvpBattleStart(event, check_cmd);
+            break;
+        case CMD_PVP_BATTLE_END:
+            processPvpBattleEnd(event, check_cmd);
+            break;
+        case CMD_ADD_BUILDING:
+            processAddBuilding(event, check_cmd);
+            break;
+        case CMD_SAVE_BUILDINGS:
+            processSaveBuildings(event, check_cmd);
+            break;
+        case CMD_UPGRADE_BUILDING:
+            processUpgradeBuilding(event, check_cmd);
+            break;
+        case CMD_DESTROY_BUILDING:
+            processDestroyBuilding(event, check_cmd);
+            break;
+        case CMD_SET_GEM:
+            processSetGem(event, check_cmd);
+            break;
+        case CMD_LOAD_HONOR_EXC_STATUS:
+            processLoadHonorExcStatus(event, check_cmd);
+            break;
+        case CMD_HONOR_EXC:
+            processHonorExc(event, check_cmd);
+            break;
+        case CMD_LOAD_GEARS:
+            processLoadGears(event, check_cmd);
+            break;
+        case CMD_UPGRADE_GEAR:
+            processUpgradeGear(event, check_cmd);
+            break;
+        case CMD_SET_DEFEND_TEAM:
+            processSetDefendTeam(event, check_cmd);
+            break;
         default:
             break;
     }
@@ -4415,6 +4466,7 @@ void EventHandler::setStageInfo(User *user)
 }
 bool EventHandler::addStageReward(User *user, StageReward * rew,long long now)
 {
+    /*
     if(rew->type == ITEM_TYPE_HERO){
         bool check = dh_->addNewHero(user, rew->subtype, rew->param_1, rew->param_2, now);
         if(check == true){
@@ -4452,7 +4504,106 @@ bool EventHandler::addStageReward(User *user, StageReward * rew,long long now)
         return check;
     }
     return true;
+    */
+    return addReward(user, rew->type, rew->subtype, rew->param_1, rew->param_2);
 }
+
+bool EventHandler::addReward(User *user, Reward *rw) {
+    return addReward(user, rw->type, rw->subtype, rw->param_1, rw->param_2);
+}
+
+bool EventHandler::addReward(User *user, int type, int subtype, int param_1, int param_2) {
+    bool check = false;
+    switch(type) {
+        case ITEM_TYPE_HERO:
+            {
+                check = dh_->addNewHero(user, subtype, param_1, param_2, now_time_);
+                if (check == true) {
+                    LOG4CXX_INFO(logger_, "addnewhero;"<<user->uid_<<";"<<subtype<<";"<<param_1<<";"<<param_2);
+                }
+            }
+            break;
+        case ITEM_TYPE_SOLDIER:
+            {
+                check = dh_->addNewSoldier(user, subtype, param_1, param_2, now_time_);
+                if(check == true){
+                    LOG4CXX_INFO(logger_, "addnewsoldier;"<<user->uid_<<";"<<subtype<<";"<<param_1<<";"<<param_2);
+                }
+            }
+            break;
+        case ITEM_TYPE_RESOURCE:
+        case ITEM_TYPE_CHIP:
+            {
+                check = dh_->addItem(user, type, subtype, 1, now_time_);
+                if(check == true){
+                    Item * item = safeGetItem(user, type, subtype);
+                    if(item != NULL){
+                         LOG4CXX_INFO(logger_, "addnewitem;"<<user->uid_<<";"<<item->amount_);
+                    }
+                }
+            }
+            break;
+        case ITEM_TYPE_GOLD:
+            {
+                user->gold_ += param_1;
+                check = dh_->saveUser(user);
+                if (check == true) {
+                    LOG4CXX_INFO(logger_, "addgold;"<<user->uid_<<";"<<user->gold_);
+                }
+            }
+            break;
+        case ITEM_TYPE_DIAMOND:
+            {
+                user->diamond_ += param_1;
+                check = dh_->saveUser(user);
+                if (check == true) {
+                    LOG4CXX_INFO(logger_, "adddiamond;"<<user->uid_<<";"<<user->diamond_);
+                }
+            }
+            break;
+        case ITEM_TYPE_HONOR:
+            {
+                user->honor_ += param_1;
+                check = dh_->saveUser(user);
+                if (check) {
+                    LOG4CXX_INFO(logger_, "addhonor;"<<user->uid_<<";"<<user->honor_);
+                }
+            }
+            break;
+        case ITEM_TYPE_GEAR:
+            //TODO
+            break;
+        case ITEM_TYPE_GEAR_CHIP:
+            //TODO
+            break;
+        case ITEM_TYPE_PROP:
+            //TODO
+            break;
+        case ITEM_TYPE_WOOD:
+            {
+                user->wood_ += param_1;
+                check = dh_->addUserPvpInfo(user);
+                if (check) {
+                    LOG4CXX_INFO(logger_, "addwood;"<<user->uid_<<";"<<user->wood_);
+                }
+            }
+            break;
+        case ITEM_TYPE_STONE:
+            {
+                user->stone_ += param_1;
+                check = dh_->addUserPvpInfo(user);
+                if (check) {
+                    LOG4CXX_INFO(logger_, "addstone;"<<user->uid_<<";"<<user->stone_);
+                }
+            }
+            break;
+        default:
+            break;
+    }
+    return check;
+}
+
+
 void EventHandler::resetBattleInfo(User *user)
 {
     user->stage_type_ = 0;
@@ -4479,6 +4630,7 @@ bool EventHandler::dailyUpdateUser(User *user,int cmd_code,int fd)
     user->receive_energy_daily_limit_ = 0;
     user->login_sum_ ++;
     user->buy_energy_daily_ = 0;
+    user->dateChange();
 
     FriendInfo * fr = safeGetFriendInfo(user, FAKE_USER_ID, cmd_code, fd);
     if(fr != NULL){

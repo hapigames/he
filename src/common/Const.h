@@ -120,13 +120,17 @@ enum LOADED_STATUS_ {
 //item type
 enum ITEM_TYPE_ {
     ITEM_TYPE_HERO = 0,
-    ITEM_TYPE_SOLDIER = 1,
-    ITEM_TYPE_RESOURCE = 2,
-    ITEM_TYPE_CHIP = 3,
+    ITEM_TYPE_SOLDIER =  1,
+    ITEM_TYPE_RESOURCE = 2, //升级技能所需的材料
+    ITEM_TYPE_CHIP = 3, //TODO 这个碎片指的是 魂魄 暂时不改它
     ITEM_TYPE_GOLD = 4,
     ITEM_TYPE_DIAMOND = 5,
-    ITEM_TYPE_EQUIPMENT = 6,
-    ITEM_TYPE_MATERIAL = 7,
+    ITEM_TYPE_HONOR = 6,
+    ITEM_TYPE_GEAR = 7,
+    ITEM_TYPE_GEAR_CHIP = 8,
+    ITEM_TYPE_PROP = 9,
+    ITEM_TYPE_WOOD = 10,
+    ITEM_TYPE_STONE = 11,
 };
 
 //cmd_code
@@ -217,19 +221,21 @@ enum CMD_CODE_ {
 
     CMD_LOAD_BUILDINGS = 83,
     CMD_LOAD_BUILDINGS_BY_ID = 84,
-    CMD_LOAD_PVP_RANKS = 85,
-    CMD_LOAD_PVP_TARGETS = 86,
-    CMD_PVP_BATTLE_START = 87,
-    CMD_PVP_BATTLE_END = 88,
-    CMD_ADD_BUILDING = 89,
-    CMD_SAVE_BUILDINGS = 90,
-    CMD_UPGRADE_BUILDING = 91,
-    CMD_DESTROY_BUILDING = 92,
-    CMD_SET_GEM = 93,
-    CMD_LOAD_HONOR_EXC_STATUS = 94,
-    CMD_HONOR_EXC = 95,
-    CMD_LOAD_GEARS = 96,
-    CMD_UPGRADE_GEAR = 97,
+    CMD_LOAD_PVP_RANKS = 85, //当前玩排行版
+    CMD_LOAD_PVP_TARGETS = 86, //可攻打玩家列表（排行改变)
+    CMD_LOAD_PVP_LOOT_TARGETS = 87, //可掠夺玩家列表
+    CMD_PVP_BATTLE_START = 88,
+    CMD_PVP_BATTLE_END = 89,
+    CMD_ADD_BUILDING = 90,
+    CMD_SAVE_BUILDINGS = 91,
+    CMD_UPGRADE_BUILDING = 92,
+    CMD_DESTROY_BUILDING = 93,
+    CMD_SET_GEM = 94,
+    CMD_LOAD_HONOR_EXC_STATUS = 95,
+    CMD_HONOR_EXC = 96,
+    CMD_LOAD_GEARS = 97,
+    CMD_UPGRADE_GEAR = 98,
+    CMD_SET_DEFEND_TEAM = 99,
     
 };
 
@@ -324,17 +330,19 @@ static string cmd_list[] = {
     "loadbuildingsbyid", //84
     "loadpvprank", //85
     "loadpvptargets", //86
-    "pvpbattlestart", //87
-    "pvpbattleend", //88
-    "addbuilding", //89
-    "savebuildings", //90
-    "upgradebuilding", //91
-    "destroybuilding", //92
-    "setgem", //93
-    "loadhonorexcstate", //94
-    "honorexc", //95
-    "loadgears", //96
-    "upgradegear", //97
+    "loadloottargets", //87
+    "pvpbattlestart", //88
+    "pvpbattleend", //89
+    "addbuilding", //90
+    "savebuildings", //91
+    "upgradebuilding", //92
+    "destroybuilding", //93
+    "setgem", //94
+    "loadhonorexcstate", //95
+    "honorexc", //96
+    "loadgears", //97
+    "upgradegear", //98
+    "setdefendteam" //99
 
 
     "", //END 必须以空字符串结尾
@@ -431,6 +439,12 @@ enum ERR_CODE_ {
     ERROR_HONOR_NOT_ENOUGH = 86,
     ERROR_GEAR_NOT_ENOUGH = 87,
     ERROR_GEAR_REACH_MAX_LEVEL = 88,
+    ERROR_PVP_UNDER_ATTACK = 89,
+    ERROR_PVP_NOT_ATTACK_TARGET = 90,
+    ERROR_PVP_RANK_IS_EMPTY = 91,
+    ERROR_PVP_BATTLE_TYPE_ERROR = 92,
+    ERROR_PVP_ATTACK_DAILI_LIMIT = 93,
+    ERROR_TOWER_NOT_FOUND = 94,
 
 };
 

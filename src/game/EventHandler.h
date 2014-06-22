@@ -42,6 +42,8 @@ public:
     ~EventHandler();
     
     void handle(EventCmd &e);
+
+    time_t now_time_;
     
     NetHandler * nh_;
     EventQueue * eq_;
@@ -140,8 +142,10 @@ public:
 
     void processLoadbuildings(EventCmd &e, vector<string> &check_cmd) ;
     void processLoadBuildingsById(EventCmd &e, vector<string> &check_cmd) ;
-    void processPvpRanks(EventCmd &e, vector<string> &check_cmd) ;
-    void processPvpTargets(EventCmd &e, vector<string> &check_cmd) ;
+    void buildPvpRanksResponse(hstring &hstr, vector <int>& rankids, int cmd_code);
+    void processLoadPvpRanks(EventCmd &e, vector<string> &check_cmd) ;
+    void processLoadPvpTargets(EventCmd &e, vector<string> &check_cmd) ;
+    void processLoadPvpLootTargets(EventCmd &e, vector <string> &check_cmd);
     void processPvpBattleStart(EventCmd &e, vector<string> &check_cmd) ;
     void processPvpBattleEnd(EventCmd &e, vector<string> &check_cmd) ;
     void processAddBuilding(EventCmd &e, vector<string> &check_cmd) ;
@@ -153,6 +157,7 @@ public:
     void processHonorExc(EventCmd &e, vector<string> &check_cmd) ;
     void processLoadGears(EventCmd &e, vector<string> &check_cmd) ;
     void processUpgradeGear(EventCmd &e, vector<string> &check_cmd) ;
+    void processSetDefendTeam(EventCmd &e, vector <string> &check_cmd);
     
     void sendErrorResponse(int fd,int cmd_code,int error_code);
     void sendErrorResponseFroPayment(int fd,int cmd_code,int error_code,string &tran_id);
@@ -188,6 +193,8 @@ public:
     void setStageInfo(User * user);
     void resetBattleInfo(User * user);
     bool addStageReward(User * user,StageReward *rew,long long now);
+    bool addReward(User * user,Reward *rew);
+    bool addReward(User *user, int type, int subtype, int param_1, int param_2);
     Stage *  preCheckCanBattle(User * user,int type,int chapter_id,int stage_id,long long now,int cmd_code,int fd);
     bool preCheckBagLength(User * user , Stage * stage);
     bool dailyUpdateUser(User * user,int cmd_code,int fd);

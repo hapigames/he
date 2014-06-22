@@ -56,7 +56,7 @@ public:
     GearConf():mid_(0),star_(0),position_(0) {}
     int mid_;
     int star_;
-    int position_;
+    int position_; //部位
 };
 
 class ItemConf {
@@ -69,23 +69,25 @@ public:
 
 class BuildConf {
 public:
-    BuildConf() :mid_(0), req_user_level_(0), req_tower_level_(0) {}
+    BuildConf() :mid_(0), level_(0), req_user_level_(0), req_tower_level_(0) {}
     int mid_;
+    int level_;
     int req_user_level_;
     int req_tower_level_; //主基地等级 当mid不是主基地时才有效
-    vector <ItemConf> req_items_;
-    vector <ItemConf> reward_items_;
+    vector <Reward> req_items_;
+    vector <Reward> reward_items_;
+    vector <int> positions_;
 };
 
 class HonorExcConf {
 public:
-    HonorExcConf() : index_(0), mid_(0), req_user_level_(0), req_honor_(0), daily_exc_limit_(0), all_exc_limit_(0) {}
+    HonorExcConf() : index_(0), req_user_level_(0), req_honor_(0), daily_exc_limit_(0), all_exc_limit_(0) {}
     int index_;
-    int mid_;
     int req_user_level_;
     int req_honor_;
     int daily_exc_limit_;
     int all_exc_limit_;
+    Reward reward;
 };
 
 class GemConf {
@@ -265,33 +267,61 @@ public:
     map<string,PaymentConfig* > payment_;
     
     map<int,ActConfig *> act_config_;
+
+    int pvp_req_user_level_;
     
     //pvp conf
     //gear :mid. start 1
     vector <GearConf> gear_conf_;
-    //:position,star,enhance
+    //gear upgrade: position,star,enhance
     vector <vector <vector <int> > > gear_enhance_req_gold_;
     vector <vector <vector <int> > > gear_sell_gold_;
     //build :mid,level start 1 //到多少等级需要的配置
     vector <vector <BuildConf> > build_conf_;
     //honor exc: index
     vector <HonorExcConf> honor_exc_conf_;
+    //gem:  mid 
+    vector <GemConf> gem_conf_;
     //rank 全服排行版大小
     int pvp_rank_list_size_; 
-    //自己在排行版周围的情况
-    int pvp_owner_ranks_size_; 
-    int pvp_owner_rank_forward_cnt_;
-    int pvp_owner_rank_backward_cnt_;
-    vector <int> pvp_owner_rank_range_;
-    vector <int> pvp_owner_rank_step_;
-    //plunder
-    //待定
-    //gem :mid, start 1
-    vector <GemConf> gem_conf_;
+    //排名显示
+    vector <int> pvp_rank_interval_range_;
+    vector <int> pvp_rank_interval_;
+    //排名奖励
+    vector <int> pvp_rank_reward_id_;
+    vector <int> pvp_rank_reward_range_;
+    vector <int> pvp_rank_reward_honor_;
+    vector <vector <Reward> > pvp_rank_reward_;
+    //掠夺系统奖励
+    vector <int>  rob_system_reward_id_;
+    vector <int>  rob_system_reward_range_;
+    vector <int> rob_system_reward_honor_;
+
+    //
+    int rob_range_before_;
+    int rob_range_after_;
+    int rob_player_num_;
+    int rob_robot_num_;
+    int rob_gold_percent_;
+    int rob_log_percent_;
+    int rob_stone_percent_;
+    int pvp_win_honor_; //掠夺成功荣誉奖励
+    int pvp_lose_honor_;//掠夺失败荣誉奖励
+
+    int pvp_load_rank_size_;
+    int pvp_rank_attack_before_;
+    int pvp_rank_attack_after_;
+    
+    int pvp_rob_attack_daily_limit_;
+    int pvp_rank_attack_daily_limit_;
+
 
     //util
     void readIntVectorFillZero(vector<int> &v,Setting & st,const char * name);
+    void readIntVector(vector <int> &v, Setting &st, const char *tit);
     void readReward(Reward &rew,Setting &st);
+    void readReward(vector <Reward> &v, Setting &st);
+    void readReward(vector <vector <Reward> > &v, Setting &st, const char *tit);
     void readStageReward(StageReward &rew,Setting &st);
     void readEnhanceCost(EnhanceCost &ec,Setting &st);
     void readSoul(Soul &soul,Setting &st);
@@ -312,6 +342,10 @@ public:
 
     int  rewardCombine(int type);
     void insertRewardStage(vector <StageReward> &rewards, StageReward &sr);
+
+    //vi 不能为空
+    int randIdx(vector <int> &vi, int weight);
+    bool checkInVector(vector <int> &vi, int n) { return find(vi.begin(), vi.end(), n) != vi.end(); }
 
     /////////////////////////////////////////////////
     vector<int> act_2_level_;

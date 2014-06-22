@@ -752,9 +752,9 @@ void buildLoadBuildingsResponse(hstring &hstr, User *user) {
     hstr<<user->honor_<<user->gold_<<user->diamond_<<user->wood_<<user->stone_;
 }
 
-void buildStartBuildingsResponse(hstring &hstr, User *user) {
+void buildLoadBuildingsByIdResponse(hstring &hstr, User *user, int cmd_code) {
     
-    hstr<<cmd_list[CMD_LOAD_BUILDINGS_BY_ID]<<0<<user->uid_;
+    hstr<<cmd_list[cmd_code]<<0<<user->uid_;
     bool had_team = false;
     long long pvp_hid = 0;
     if (user->pvp_team_id_ > 0) {
@@ -821,22 +821,25 @@ void buildStartBuildingsResponse(hstring &hstr, User *user) {
         }
     }
 
-    
     hstr<<user->build_infs_.size();
 
     for (map <long long, BuildInf>::iterator iter = user->build_infs_.begin(); iter != user->build_infs_.end(); iter++) {
         hstring buildstr(",");
         const BuildInf &binf = iter->second;
-
         buildstr<<binf.id_<<binf.mid_<<binf.level_<<binf.position_<<binf.gem_type_;
-
         hstr<<buildstr;
-
         buildstr.clear();
     }
 
-    //TODO 计算获得的资源数
-    hstr<<1<<1<<0<<1<<1;
+    int gold = (int) user->gold_ * game_config.rob_gold_percent_ / 100;
+    gold = max(gold, 1);
+    int wood = (int) user->wood_ * game_config.rob_log_percent_ / 100;
+    wood = max(wood, 1);
+    int stone = (int) user->stone_ * game_config.rob_stone_percent_ / 100;
+    stone = max(stone, 1);
+    //TODO 
+    int honor = 0;
+    hstr<<honor<<gold<<0<<wood<<stone;
 }
 
 

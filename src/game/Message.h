@@ -108,6 +108,6 @@ string buildInstantBattleResponse(User* user, vector<Mission*> &mv, vector<Stage
 string buildResetEliteStageResponse(User* user);
 
 void buildLoadBuildingsResponse(hstring &hstr, User *user);
-void buildLoadBuildingsByIdResponse(hstring &hstr, User *user);
+void buildLoadBuildingsByIdResponse(hstring &hstr, User *user, int cmd_code);
 
 #endif

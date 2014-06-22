@@ -108,7 +108,26 @@ bool GameConfig::loadFromFile()
         trial_rank_num_ = sys_config["trial_rank_num"];
         trial_times_per_day_ = sys_config["trial_times_per_day"];
         trial_time_per_stage_ = sys_config["trial_time_per_stage"];
-        
+
+        rob_range_before_ = sys_config["rob_range_before"];
+        rob_range_after_ = sys_config["rob_range_after"];
+        rob_player_num_ = sys_config["rob_player_num"];
+        rob_robot_num_ = sys_config["rob_robot_num"];
+        rob_gold_percent_ = sys_config["rob_gold_percent"];
+        rob_log_percent_ = sys_config["rob_log_percent"];
+        rob_stone_percent_ = sys_config["rob_stone_percent"];
+        pvp_win_honor_ = sys_config["pvp_win_honor"];
+        pvp_lose_honor_ = sys_config["pvp_lose_honor"];
+
+        //TODO
+        pvp_load_rank_size_ = 10;
+        pvp_rank_attack_before_ = 5;
+        pvp_rank_attack_after_ = 4;
+        pvp_req_user_level_ = 3;
+
+        pvp_rank_attack_daily_limit_ = 10;
+        pvp_rob_attack_daily_limit_ = 10;
+
         time_area_fix_ = 1391270400LL;
         energy_price_.clear();
         for(int i = 0;i<sys_config["energy_price"].getLength();i++){
@@ -631,6 +650,108 @@ bool GameConfig::loadFromFile()
             act_config_.insert(make_pair(ac->act_id_,ac));
         }
 
+        //gerl
+        const Setting &gearconf = st["gear"];
+        gear_conf_.clear();
+        for (int i = 0; i < gearconf.getLength(); i++) {
+            GearConf gc;
+            gc.mid_ = gearconf[i]["mid"];
+            gc.star_ = gearconf[i]["star"];
+            gc.position_ = gearconf[i]["position"];
+            gear_conf_.push_back(gc);
+        }
+        gear_enhance_req_gold_.clear();
+        gear_sell_gold_.clear();
+        const Setting &gcupgrade = st["gear_upgrade"];
+        for (int i = 0; i < gcupgrade.getLength(); i++) {
+            int pos = gcupgrade[i]["position"];
+            int star = gcupgrade[i]["star"];
+            int el = gcupgrade[i]["enhance_level"];
+            if ((int)gear_enhance_req_gold_.size() <= pos) {
+                gear_enhance_req_gold_.resize(pos+1, vector <vector <int> >());
+                gear_sell_gold_.resize(pos+1, vector <vector <int> >());
+            }
+            if ((int) gear_enhance_req_gold_[pos].size() <= star) {
+                gear_enhance_req_gold_[pos].resize(star+1, vector <int>());
+                gear_sell_gold_[pos].resize(star+1, vector <int>());
+            }
+            if ((int) gear_enhance_req_gold_[pos][star].size() <= el) {
+                gear_enhance_req_gold_[pos][star].resize(el+1, 0);
+                gear_sell_gold_[pos][star].resize(el+1, 0);
+            }
+            gear_enhance_req_gold_[pos][star][el] = gcupgrade[i]["req_gold"];
+            gear_sell_gold_[pos][star][el] = gcupgrade[i]["sell_gold"];
+        }
+
+        //building
+        build_conf_.clear();
+        const Setting &bdconf = st["building"];
+        for (int i = 0; i < bdconf.getLength(); i++) {
+            int m = bdconf[i]["mid"];
+            int lv = bdconf[i]["level"];
+            if ((int)build_conf_.size() <= m) {
+                build_conf_.resize(m+1, vector <BuildConf>());
+            }
+            if ((int)build_conf_[m].size() <= lv) {
+                build_conf_[m].resize(lv+1, BuildConf());
+            }
+            build_conf_[m][lv].mid_ = m;
+            build_conf_[m][lv].level_ = lv;
+            build_conf_[m][lv].req_user_level_ = bdconf[i]["req_user_level"];
+            build_conf_[m][lv].req_tower_level_ = bdconf[i]["req_tower_level"];
+            readReward(build_conf_[m][lv].req_items_, bdconf[i]["req_item"]);
+            readReward(build_conf_[m][lv].reward_items_, bdconf[i]["reward"]);
+            for (int j = 0; j < bdconf[i]["position"].getLength(); j++) {
+                int pos = bdconf[i]["position"][j];
+                if (pos >= 0) {
+                    build_conf_[m][lv].positions_.push_back((bdconf[i]["position"][j]));
+                }
+            }
+        }
+
+        //gem
+        gem_conf_.clear();
+        const Setting &gemconf = st["gem"];
+        for (int i = 0; i < gemconf.getLength(); i++) {
+            int mid = gemconf[i]["mid"];
+            if ((int)gem_conf_.size() <= mid) {
+                gem_conf_.resize(mid+1);
+            }
+            gem_conf_[mid].mid_ = mid;
+            gem_conf_[mid].req_gold_ = gemconf[i]["req_gold"];
+            gem_conf_[mid].req_diamond_ = gemconf[i]["req_diamond"];
+        }
+        //honor exc
+        honor_exc_conf_.clear();
+        const Setting &hecconf = st["honor_exchange"];
+        for (int i = 0; i < hecconf.getLength(); i++) {
+            int index = hecconf[i]["index"];
+            if ((int)honor_exc_conf_.size() <= index) {
+                honor_exc_conf_.resize(index+1);
+            }
+            honor_exc_conf_[index].index_ = index;
+            honor_exc_conf_[index].req_user_level_ = hecconf[i]["req_user_level"];
+            honor_exc_conf_[index].req_honor_ = hecconf[i]["req_honor"];
+            honor_exc_conf_[index].daily_exc_limit_ = hecconf[i]["daily_exc_limit"];
+            honor_exc_conf_[index].all_exc_limit_ = hecconf[i]["all_exc_limit"];
+            //void GameConfig::readReward(Reward &rew, Setting &st)
+            readReward(honor_exc_conf_[index].reward, hecconf[i]["reward"]);
+        }
+
+        pvp_rank_interval_range_.clear();
+        pvp_rank_interval_.clear();
+        readIntVector(pvp_rank_interval_range_, st["pvp_rank_interval"], "start");
+        readIntVector(pvp_rank_interval_, st["pvp_rank_interval"], "interval");
+
+        readIntVector(pvp_rank_reward_id_, st["pvp_rank_reward"], "id");
+        readIntVector(pvp_rank_reward_range_, st["pvp_rank_reward"], "start");
+        readIntVector(pvp_rank_reward_honor_, st["pvp_rank_reward"], "reward_honor");
+        readReward(pvp_rank_reward_, st["pvp_rank_reward"], "reward");
+
+        readIntVector(rob_system_reward_id_, st["rob_system_reward"], "id");
+        readIntVector(rob_system_reward_range_, st["rob_system_reward"], "start");
+        readIntVector(rob_system_reward_honor_, st["rob_system_reward"], "reward_honor");
+
     }
     catch(ParseException ex){
         LOG4CXX_ERROR(logger_, "system;Parse config "<<game_config_.c_str()<<" failed at line "<<ex.getLine());
@@ -675,6 +796,14 @@ void GameConfig::readIntVectorFillZero(vector<int> &v, Setting & st,const char *
         v.push_back(vaddress[i]);
     }
 }
+
+void GameConfig::readIntVector(vector <int> &v, Setting &st, const char *tit) {
+    v.clear();
+    for (int i = 0; i < st.getLength(); i++) {
+        v.push_back(st[i][tit]);
+    }
+}
+
 void GameConfig::readReward(Reward &rew, Setting &st)
 {
     rew.type = st[0];
@@ -682,6 +811,23 @@ void GameConfig::readReward(Reward &rew, Setting &st)
     rew.param_1 = st[2];
     rew.param_2 = st[3];
 }
+
+void GameConfig::readReward(vector <Reward> &v, Setting &st) {
+    v.clear();
+    for (int i = 0; i < st.getLength(); i++) {
+        v.push_back(Reward());
+        readReward(v[i], st[i]);
+    }
+}
+
+void GameConfig::readReward(vector <vector <Reward> > &v, Setting &st, const char *tit) {
+    v.clear();
+    for (int i = 0; i < st.getLength(); i++) {
+        v.push_back(vector <Reward> ());
+        readReward(v[i], st[i][tit]);
+    }
+}
+
 void GameConfig::readStageReward(StageReward &rew, Setting &st)
 {
     rew.type = st[0];
@@ -886,5 +1032,13 @@ void GameConfig::insertRewardStage(vector <StageReward> &rewards, StageReward &s
         }
     }
     rewards.push_back(sr);
+}
+
+int GameConfig::randIdx(vector <int> &vi, int weight) {
+    int pos = (int) (lower_bound(vi.begin(), vi.end(), weight) - vi.begin());
+    if (pos >= (int) vi.size()) {
+        pos --;
+    }
+    return pos;
 }
 

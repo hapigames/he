@@ -394,7 +394,6 @@ void EventHandler::processPvpBattleEnd(EventCmd &e, vector<string> &check_cmd) {
         }
         else if (bttype == 0) {
             get_h = game_config.pvp_win_honor_;
-
             if (user->pvp_rank_  > tuser->pvp_rank_ && tuser->pvp_rank_ != 0) {
                 int rank = user->pvp_rank_;
                 user->pvp_rank_ = tuser->pvp_rank_;
@@ -405,16 +404,40 @@ void EventHandler::processPvpBattleEnd(EventCmd &e, vector<string> &check_cmd) {
         }
         else if (bttype == 1) {
             get_h = game_config.pvp_win_honor_;
+            get_gold = (int) tuser->gold_ * game_config.rob_gold_percent_ / 100;
+            get_gold = max(get_gold , 1);
+            get_w = (int) tuser->wood_ * game_config.rob_log_percent_ / 100;
+            get_w = max(get_w, 1);
+            get_st = (int) tuser->stone_ * game_config.rob_stone_percent_ / 100;
+            get_st = max(get_st, 1);
         }
+        //增加奖励 扣掉奖励
+        user->honor_ += get_h;
+        user->gold_ += get_gold;
+        user->diamond_ += get_dmd;
+        user->wood_ += get_w;
+        user->stone_ += get_st;
 
-        //TODO 增加奖励 扣掉奖励
+        tuser->gold_ -= get_gold;
+        tuser->diamond_ -= get_dmd;
+        tuser->wood_ -= get_w;
+        tuser->stone_ -= get_st;
+        tuser->gold_ = max(tuser->gold_, 0);
+        tuser->diamond_ = max(tuser->diamond_, 0);
+        tuser->wood_ = max(tuser->wood_, 0);
+        tuser->stone_ = max(tuser->stone_, 0);
+
+        //TODO LOG
+        dh_->saveUser(user);
+        dh_->saveUser(tuser);
+        dh_->addUserPvpInfo(user);
+        dh_->addUserPvpInfo(tuser);
     }
     hstring hstr(";");
     hstr<<cmd_list[CMD_PVP_BATTLE_END]<<succ;
     int rk_limit = game_config.pvp_rank_attack_daily_limit_ - user->pvp_rank_attack_count_;
     int rob_limit = game_config.pvp_rob_attack_daily_limit_ - user->pvp_rob_attack_count_;
     if (succ == 0) {
-        //TODO 100只是暂时性的
         hstr<<user->pvp_rank_<<rk_limit<<rob_limit<<user->honor_<<user->gold_<<user->diamond_<<user->wood_<<user->stone_;
         hstr<<get_h<<get_gold<<get_dmd<<get_w<<get_st;
     }

@@ -342,8 +342,7 @@ static string cmd_list[] = {
     "honorexc", //96
     "loadgears", //97
     "upgradegear", //98
-    "setdefendteam" //99
-
+    "setdefendteam", //99
 
     "", //END 必须以空字符串结尾
 };

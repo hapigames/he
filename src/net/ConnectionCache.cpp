@@ -151,7 +151,7 @@ bool ConnectionCache::prepareToWrite(string &s)
 
 bool ConnectionCache::prepareToWrite(const char *str, size_t len) {
     lockWrite();
-    int size = len + 1;
+    int size = (int)len + 1;
     if(size > (int)wsize_ - 1 - wpos_){
         size_t nwsize = max((int)wsize_ * 2,(int)wpos_ + size + 1024);
         printf("resize wbuf\n");
@@ -169,8 +169,8 @@ bool ConnectionCache::prepareToWrite(const char *str, size_t len) {
             wbuf_ = nwbuf;
         }
     }
-    memcpy(wbuf_ + wpos_, str, size);
-    wpos_ += size;
+    memcpy(wbuf_ + wpos_, str, len);
+    wpos_ += len;
     wbuf_[wpos_] = '\0';
     wpos_ ++;
     printf("ready to send:%s\n",wbuf_);

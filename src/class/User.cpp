@@ -238,13 +238,17 @@ void User::dateChange() {
     pvp_rank_attack_count_ = pvp_rob_attack_count_ = 0;
 }
 
+void User::clearAttack(time_t now) {
+    pvp_attack_type_ = 0;
+    pvp_attack_tuid_ = 0;
+    pvp_attacked_tuid_ = 0;
+    pvp_attack_start_time_ = now;
+}
+
 bool User::canAttack(time_t now) {
     if (now >= pvp_attack_start_time_ + 600) {
-        pvp_attack_type_ = 0;
-        pvp_attack_tuid_ = 0;
-        pvp_attacked_tuid_ = 0;
-        pvp_attack_start_time_ = now;
+        clearAttack(now);
     }
-    return pvp_attacked_tuid_ == 0;
+    return pvp_attacked_tuid_ == 0 && pvp_attack_tuid_ == 0;
 }
 

@@ -107,7 +107,7 @@ string buildForceSEUResponse();
 string buildInstantBattleResponse(User* user, vector<Mission*> &mv, vector<StageReward*> &rv);
 string buildResetEliteStageResponse(User* user);
 
-void buildLoadBuildingsResponse(hstring &hstr, User *user);
-void buildLoadBuildingsByIdResponse(hstring &hstr, User *user, int cmd_code);
+string buildLoadBuildingsResponse(User *user);
+string buildLoadBuildingsByIdResponse(User *user, int cmd_code, int bttype);
 
 #endif

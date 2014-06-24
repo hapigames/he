@@ -3717,9 +3717,9 @@ void EventHandler::processInstantTrial(EventCmd &e, vector<string> &check_cmd) {
     
         dh_->saveUserTrialInfo(user);
 
-        hstring logstr(",");
-        logstr<<uid<<user->trial_stage_id_<<user->trial_max_stage_id_<<now;
-        LOG4CXX_DEBUG(logger_, "trialinstant: "<<logstr);
+        ostringstream oss;
+        oss<<uid<<","<<user->trial_stage_id_<<","<<user->trial_max_stage_id_<<","<<now;
+        LOG4CXX_DEBUG(logger_, "trialinstant: "<<oss.str());
     }
 
 
@@ -3805,9 +3805,9 @@ void EventHandler::processTrialProgress(EventCmd &e, vector<string> &check_cmd) 
                 user->trial_instant_start_time_ = 0;
                 user->trial_stage_id_ = user->trial_max_stage_id_ + 1;
 
-                hstring logstr(",");
-                logstr<<uid<<user->trial_stage_id_<<user->trial_max_stage_id_<<user->trial_instant_start_time_;
-                LOG4CXX_INFO(logger_, "trialinstantprize: "<<logstr<<","<<contents);
+                ostringstream oss;
+                oss<<uid<<","<<user->trial_stage_id_<<","<<user->trial_max_stage_id_<<","<<user->trial_instant_start_time_;
+                LOG4CXX_INFO(logger_, "trialinstantprize: "<<oss.str()<<","<<contents);
                 
                 if (!dh_->saveStageRecord(sr) || !dh_->saveUserTrialInfo(user)) {
                     LOG4CXX_ERROR(logger_, "trial;save trial info data failed");
@@ -3899,9 +3899,9 @@ void EventHandler::processResetTrialStage(EventCmd &e, vector <string> &check_cm
             sr->update_time_ = now;
             dh_->saveStageRecord(sr);
 
-            hstring logstr(",");
-            logstr<<uid<<user->trial_stage_id_<<user->trial_max_stage_id_<<user->trial_daily_reset_;
-            LOG4CXX_INFO(logger_, "trialreset: "<<logstr);
+            ostringstream oss;
+            oss<<uid<<","<<user->trial_stage_id_<<","<<user->trial_max_stage_id_<<","<<user->trial_daily_reset_;
+            LOG4CXX_INFO(logger_, "trialreset: "<<oss.str());
         }
     }
     else if (succ == 0 ) {
@@ -3938,9 +3938,9 @@ void EventHandler::processTrialRelive(EventCmd &e, vector <string> &check_cmd) {
     else {
         user->diamond_ --;
         //TODO log
-        hstring logstr(",");
-        logstr<<uid<<chid<<stid<<user->diamond_;
-        LOG4CXX_INFO(logger_, "tiralrelive: "<<logstr);
+        ostringstream oss;
+        oss<<uid<<","<<chid<<","<<stid<<","<<user->diamond_;
+        LOG4CXX_INFO(logger_, "tiralrelive: "<<oss.str());
     }
     ostringstream ost;
     ost<<cmd_list[CMD_TRIAL_RELIVE]<<";"<<succ<<";"<<user->diamond_;

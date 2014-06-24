@@ -55,17 +55,18 @@ void EventHandler::processLoadbuildings(EventCmd &e, vector<string> &check_cmd) 
         return;
     }
    
-    hstring hstr(";");
-    buildLoadBuildingsResponse(hstr, user);
-    nh_->sendString(e.fd_, hstr.str(), hstr.size());
-    hstr.clear();
+    string str = buildLoadBuildingsResponse(user);
+    nh_->sendString(e.fd_, str);
 }
 
 void EventHandler::processLoadBuildingsById(EventCmd &e, vector<string> &check_cmd) {
     long long uid,tuid;
-    if (check_cmd.size() != 4
+    int bttype;
+    if (check_cmd.size() != 5
             || !safeAtoll(check_cmd[1], uid)
-            || !safeAtoll(check_cmd[3], tuid)) {
+            || !safeAtoll(check_cmd[3], tuid)
+            || !safeAtoi(check_cmd[4], bttype)
+            || bttype < 0 || bttype > 1) {
         return ;
     }
     string &eqid = check_cmd[2];
@@ -84,13 +85,11 @@ void EventHandler::processLoadBuildingsById(EventCmd &e, vector<string> &check_c
         return;
     }
 
-    hstring hstr(";");
-    buildLoadBuildingsByIdResponse(hstr, tuser, CMD_LOAD_BUILDINGS_BY_ID);
-    nh_->sendString(e.fd_, hstr.str(), hstr.size());
-
+    string str = buildLoadBuildingsByIdResponse(tuser, CMD_LOAD_BUILDINGS_BY_ID, bttype);
+    nh_->sendString(e.fd_, str);
 }
 
-void EventHandler::buildPvpRanksResponse(hstring &hstr, vector <int>& rankids, int cmd_code) {
+void EventHandler::buildPvpRanksResponse(ostringstream &oss, vector <int>& rankids, int cmd_code) {
 
     for (size_t i = 0; i < rankids.size(); i++) {
 
@@ -98,13 +97,15 @@ void EventHandler::buildPvpRanksResponse(hstring &hstr, vector <int>& rankids, i
         long long tuid = dh_->pvp_rank_uids_[rank];
 
         int fd = 0;
-        hstring rankstr(",");
+
         User *tuser = safeGetUser(tuid, cmd_code, fd);
         if (tuser != NULL
                 && safeLoadBuildings(tuser, cmd_code, fd)
                 && safeLoadHero(tuser, cmd_code, fd)
                 && safeLoadTeam(tuser, cmd_code, fd)) {
-            rankstr<<tuid<<tuser->nick_name_<<tuser->user_level_;
+
+            oss<<tuid<<","<<tuser->nick_name_<<","<<tuser->user_level_<<",";
+
             int ndfault = 1;
             if (tuser->pvp_team_id_ > 0) {
                 Team *team = tuser->getTeam(tuser->pvp_team_id_);
@@ -112,22 +113,22 @@ void EventHandler::buildPvpRanksResponse(hstring &hstr, vector <int>& rankids, i
                     Hero *hero = tuser->getHero(team->hero_id_);
                     if (hero) {
                         ndfault = 0;
-                        rankstr<<hero->mid_<<hero->star_<<hero->level_;
+                        oss<<hero->mid_<<","<<hero->star_<<","<<hero->level_<<",";
                     }
                 }
             }
             if (ndfault) {
-                rankstr<<0<<0<<0;
+                oss<<0<<","<<0<<","<<0<<",";
             }
 
-            rankstr<<rank;
+            oss<<rank<<";";
 
         }
         else {
-            rankstr<<tuid<<" "<<1<<0<<0<<0<<rank;
+            oss<<tuid<<","<<" "<<","<<1<<","<<0<<","<<0<<","<<0<<","<<rank<<";";
         }
 
-        hstr<<rankstr;
+        //hstr<<rankstr;
     }
 }
 
@@ -146,9 +147,10 @@ void EventHandler::processLoadPvpRanks(EventCmd &e, vector<string> &check_cmd) {
         return;
     }
 
-    hstring hstr(";");
-    hstr<<cmd_list[CMD_LOAD_PVP_RANKS]<<0<<user->pvp_rank_;
-    //hstr<<(game_config.pvp_rank_attack_daily_limit_ - user->pvp_rank_attack_count_)<<(game_config.pvp_rob_attack_daily_limit_ - user->pvp_rob_attack_count_);
+    //hstring hstr(";");
+    ostringstream oss;
+
+    oss<<cmd_list[CMD_LOAD_PVP_RANKS]<<";"<<0<<";"<<user->pvp_rank_<<";";
     
     int rank_size = min((int)dh_->pvp_rank_uids_.size()-1, game_config.pvp_load_rank_size_);
 
@@ -164,14 +166,15 @@ void EventHandler::processLoadPvpRanks(EventCmd &e, vector<string> &check_cmd) {
         }
     }
     
-    hstr<<((int)rankids.size());
+    oss<<((int)rankids.size())<<";";
 
-    hstring rankstr(";");
-    buildPvpRanksResponse(rankstr, rankids, CMD_LOAD_PVP_RANKS);
+    //hstring rankstr(";");
+    
+    buildPvpRanksResponse(oss, rankids, CMD_LOAD_PVP_RANKS);
 
-    hstr<<rankstr;
-
-    nh_->sendString(e.fd_, hstr.str(), hstr.size());
+    //hstr<<rankstr;
+    string str = oss.str();
+    nh_->sendString(e.fd_, str);
 }
 
 void EventHandler::processLoadPvpTargets(EventCmd &e, vector<string> &check_cmd) {
@@ -226,17 +229,17 @@ void EventHandler::processLoadPvpTargets(EventCmd &e, vector<string> &check_cmd)
 
     sort(rankids.begin(), rankids.end());
     
-    hstring hstr(";");
-    hstr<<cmd_list[CMD_LOAD_PVP_TARGETS]<<0;
-    hstr<<(game_config.pvp_rank_attack_daily_limit_ - user->pvp_rank_attack_count_)<<(game_config.pvp_rob_attack_daily_limit_ - user->pvp_rob_attack_count_);
-    hstr<<((int)rankids.size());
-
-    hstring rankstr(";");
-    buildPvpRanksResponse(rankstr, rankids, CMD_LOAD_PVP_TARGETS);
-
-    hstr<<rankstr;
+    //hstring hstr(";");
+    ostringstream oss;
     
-    nh_->sendString(e.fd_, hstr.str(), hstr.size());
+    oss<<cmd_list[CMD_LOAD_PVP_TARGETS]<<";"<<0<<";";
+    oss<<(game_config.pvp_rank_attack_daily_limit_ - user->pvp_rank_attack_count_)<<";"<<(game_config.pvp_rob_attack_daily_limit_ - user->pvp_rob_attack_count_)<<";";
+    oss<<((int)rankids.size())<<";";
+
+    buildPvpRanksResponse(oss, rankids, CMD_LOAD_PVP_TARGETS);
+
+    string str = oss.str();
+    nh_->sendString(e.fd_, str);
 
 }
 
@@ -285,17 +288,19 @@ void EventHandler::processLoadPvpLootTargets(EventCmd &e, vector <string> &check
         }
         //TODO robot
     }
-    hstring hstr(";");
-    hstr<<cmd_list[CMD_LOAD_PVP_LOOT_TARGETS]<<succ;
-    hstr<<(game_config.pvp_rank_attack_daily_limit_ - user->pvp_rank_attack_count_)<<(game_config.pvp_rob_attack_daily_limit_ - user->pvp_rob_attack_count_);
+    //hstring hstr(";");
+    ostringstream oss;
+
+    oss<<cmd_list[CMD_LOAD_PVP_LOOT_TARGETS]<<";"<<succ<<";";
+    oss<<(game_config.pvp_rank_attack_daily_limit_ - user->pvp_rank_attack_count_)<<";"<<(game_config.pvp_rob_attack_daily_limit_ - user->pvp_rob_attack_count_)<<";";
     if (succ == 0) {
+
         //TODO 暂时只加入 player
-        hstr<<(int)rankids.size();
-        hstring rankstr(";");
-        buildPvpRanksResponse(rankstr, rankids, CMD_LOAD_PVP_LOOT_TARGETS);
-        hstr<<rankstr;
+        oss<<(int)rankids.size()<<";";
+        buildPvpRanksResponse(oss, rankids, CMD_LOAD_PVP_LOOT_TARGETS);
     }
-    nh_->sendString(e.fd_, hstr.str(), hstr.size());
+    string str = oss.str();
+    nh_->sendString(e.fd_, str);
 }
 
 void EventHandler::processPvpBattleStart(EventCmd &e, vector<string> &check_cmd) {
@@ -338,13 +343,15 @@ void EventHandler::processPvpBattleStart(EventCmd &e, vector<string> &check_cmd)
     else if (bttype == 1 && user->pvp_rob_attack_count_ >= game_config.pvp_rob_attack_daily_limit_) {
         succ = ERROR_PVP_ATTACK_DAILI_LIMIT;
     }
-    else if (!tuser->canAttack(now_time_)) {
+    else if (!tuser->canAttack(now_time_) || !user->canAttack(now_time_)) {
         succ = ERROR_PVP_UNDER_ATTACK;
     }
     else {
         user->pvp_attack_type_ = bttype;
         user->pvp_attack_tuid_ = tuid;
+        user->pvp_attack_start_time_ = now_time_;
         tuser->pvp_attacked_tuid_ = uid;
+        tuser->pvp_attack_start_time_ = now_time_;
 
         if (bttype == 0) {
             user->pvp_rank_attack_count_ ++;
@@ -355,9 +362,10 @@ void EventHandler::processPvpBattleStart(EventCmd &e, vector<string> &check_cmd)
 
         dh_->addUserPvpInfo(user);
     }
-    hstring hstr(";");
-    buildLoadBuildingsByIdResponse(hstr, tuser, CMD_PVP_BATTLE_START);
-    nh_->sendString(e.fd_, hstr.str(), hstr.size());
+    //hstring hstr(";");
+    string str = buildLoadBuildingsByIdResponse(tuser, CMD_PVP_BATTLE_START, bttype);
+    //nh_->sendString(e.fd_, hstr.str(), hstr.size());
+    nh_->sendString(e.fd_, str);
 }
 
 void EventHandler::processPvpBattleEnd(EventCmd &e, vector<string> &check_cmd) {
@@ -417,6 +425,7 @@ void EventHandler::processPvpBattleEnd(EventCmd &e, vector<string> &check_cmd) {
         user->diamond_ += get_dmd;
         user->wood_ += get_w;
         user->stone_ += get_st;
+        user->clearAttack(now_time_);
 
         tuser->gold_ -= get_gold;
         tuser->diamond_ -= get_dmd;
@@ -426,6 +435,7 @@ void EventHandler::processPvpBattleEnd(EventCmd &e, vector<string> &check_cmd) {
         tuser->diamond_ = max(tuser->diamond_, 0);
         tuser->wood_ = max(tuser->wood_, 0);
         tuser->stone_ = max(tuser->stone_, 0);
+        tuser->clearAttack(now_time_);
 
         //TODO LOG
         dh_->saveUser(user);
@@ -433,15 +443,19 @@ void EventHandler::processPvpBattleEnd(EventCmd &e, vector<string> &check_cmd) {
         dh_->addUserPvpInfo(user);
         dh_->addUserPvpInfo(tuser);
     }
-    hstring hstr(";");
-    hstr<<cmd_list[CMD_PVP_BATTLE_END]<<succ;
+
+    ostringstream oss;
+
+    oss<<cmd_list[CMD_PVP_BATTLE_END]<<";"<<succ<<";";
+
     int rk_limit = game_config.pvp_rank_attack_daily_limit_ - user->pvp_rank_attack_count_;
     int rob_limit = game_config.pvp_rob_attack_daily_limit_ - user->pvp_rob_attack_count_;
     if (succ == 0) {
-        hstr<<user->pvp_rank_<<rk_limit<<rob_limit<<user->honor_<<user->gold_<<user->diamond_<<user->wood_<<user->stone_;
-        hstr<<get_h<<get_gold<<get_dmd<<get_w<<get_st;
+        oss<<user->pvp_rank_<<";"<<rk_limit<<";"<<rob_limit<<";"<<user->honor_<<";"<<user->gold_<<";"<<user->diamond_<<";"<<user->wood_<<";"<<user->stone_<<";";
+        oss<<get_h<<";"<<get_gold<<";"<<get_dmd<<";"<<get_w<<";"<<get_st;
     }
-    nh_->sendString(e.fd_, hstr.str(), hstr.size());
+    string str = oss.str();
+    nh_->sendString(e.fd_, str);
 }
 
 void EventHandler::processAddBuilding(EventCmd &e, vector<string> &check_cmd) {
@@ -491,12 +505,13 @@ void EventHandler::processAddBuilding(EventCmd &e, vector<string> &check_cmd) {
             dh_->delBuildingReqItem(user, game_config.build_conf_[mid][1].req_items_);
         }
     }
-    hstring hstr(";");
-    hstr<<cmd_list[CMD_ADD_BUILDING]<<succ;
+    ostringstream oss;
+    oss<<cmd_list[CMD_ADD_BUILDING]<<";"<<succ<<";";
     if (succ == 0) {
-        hstr<<id<<mid<<position<<1<<user->honor_<<user->gold_<<user->diamond_<<user->wood_<<user->stone_;
+        oss<<id<<";"<<mid<<";"<<position<<";"<<1<<";"<<user->honor_<<";"<<user->gold_<<";"<<user->diamond_<<";"<<user->wood_<<";"<<user->stone_;
     }
-    nh_->sendString(e.fd_, hstr.str(), hstr.size());
+    string str = oss.str();
+    nh_->sendString(e.fd_, str);
 }
 
 void EventHandler::processSaveBuildings(EventCmd &e, vector<string> &check_cmd) {
@@ -574,9 +589,10 @@ void EventHandler::processSaveBuildings(EventCmd &e, vector<string> &check_cmd) 
             }
         }
     }
-    hstring hstr(";");
-    hstr<<cmd_list[CMD_SAVE_BUILDINGS]<<succ;
-    nh_->sendString(e.fd_, hstr.str(), hstr.size());
+    ostringstream oss;
+    oss<<cmd_list[CMD_SAVE_BUILDINGS]<<";"<<succ;
+    string str = oss.str();
+    nh_->sendString(e.fd_, str);
 
 }
 
@@ -622,12 +638,13 @@ void EventHandler::processUpgradeBuilding(EventCmd &e, vector<string> &check_cmd
         }
     }
 
-    hstring hstr(";");
-    hstr<<cmd_list[CMD_UPGRADE_BUILDING]<<succ;
+    ostringstream oss;
+    oss<<cmd_list[CMD_UPGRADE_BUILDING]<<";"<<succ<<";";
     if (succ == 0) {
-        hstr<<user->honor_<<user->gold_<<user->diamond_<<user->wood_<<user->stone_;
+        oss<<user->honor_<<";"<<user->gold_<<";"<<user->diamond_<<";"<<user->wood_<<";"<<user->stone_;
     }
-    nh_->sendString(e.fd_, hstr.str(), hstr.size());
+    string str = oss.str();
+    nh_->sendString(e.fd_, str);
 }
 
 void EventHandler::processDestroyBuilding(EventCmd &e, vector<string> &check_cmd) {
@@ -657,12 +674,13 @@ void EventHandler::processDestroyBuilding(EventCmd &e, vector<string> &check_cmd
         //TODO log
     }
 
-    hstring hstr(";");
-    hstr<<cmd_list[CMD_DESTROY_BUILDING]<<succ;
+    ostringstream oss;
+    oss<<cmd_list[CMD_DESTROY_BUILDING]<<";"<<succ<<";";
     if (succ == 0) {
-        hstr<<user->honor_<<user->gold_<<user->diamond_<<user->wood_<<user->stone_;
+        oss<<user->honor_<<";"<<user->gold_<<";"<<user->diamond_<<";"<<user->wood_<<";"<<user->stone_;
     }
-    nh_->sendString(e.fd_, hstr.str(), hstr.size());
+    string str = oss.str();
+    nh_->sendString(e.fd_, str);
 }
 
 void EventHandler::processSetGem(EventCmd &e, vector<string> &check_cmd) {
@@ -705,12 +723,13 @@ void EventHandler::processSetGem(EventCmd &e, vector<string> &check_cmd) {
         //TODO
     }
 
-    hstring hstr(";");
-    hstr<<cmd_list[CMD_SET_GEM]<<succ;
+    ostringstream oss;
+    oss<<cmd_list[CMD_SET_GEM]<<";"<<succ<<";";
     if (succ == 0) {
-        hstr<<user->honor_<<user->gold_<<user->diamond_<<user->wood_<<user->stone_;
+        oss<<user->honor_<<";"<<user->gold_<<";"<<user->diamond_<<";"<<user->wood_<<";"<<user->stone_;
     }
-    nh_->sendString(e.fd_, hstr.str(), hstr.size()); 
+    string str = oss.str();
+    nh_->sendString(e.fd_, str); 
 }
 
 void EventHandler::processLoadHonorExcStatus(EventCmd &e, vector<string> &check_cmd) {
@@ -727,16 +746,14 @@ void EventHandler::processLoadHonorExcStatus(EventCmd &e, vector<string> &check_
     if (!safeLoadHonorExcStatus(user, CMD_LOAD_HONOR_EXC_STATUS, e.fd_)) {
         return;
     }
-    hstring hstr(";");
-    hstr<<cmd_list[CMD_LOAD_HONOR_EXC_STATUS]<<0<<user->honor_exc_infs_.size();
+    ostringstream oss;
+    oss<<cmd_list[CMD_LOAD_HONOR_EXC_STATUS]<<";"<<0<<";"<<user->honor_exc_infs_.size()<<";";
     for (map <int, HonorExcInf>::iterator iter = user->honor_exc_infs_.begin();
             iter != user->honor_exc_infs_.end(); ++iter) {
-        hstring htmp(",");
-        htmp<<iter->first<<iter->second.daily_exc_count_<<iter->second.all_exc_count_;
-        hstr<<htmp;
-        htmp.clear();
+        oss<<iter->first<<","<<iter->second.daily_exc_count_<<","<<iter->second.all_exc_count_;
     }
-    nh_->sendString(e.fd_, hstr.str(), hstr.size());
+    string str = oss.str();
+    nh_->sendString(e.fd_, str);
 }
 
 void EventHandler::processHonorExc(EventCmd &e, vector<string> &check_cmd) {
@@ -784,12 +801,13 @@ void EventHandler::processHonorExc(EventCmd &e, vector<string> &check_cmd) {
         //TODO 
     }
 
-    hstring hstr(";");
-    hstr<<cmd_list[CMD_HONOR_EXC]<<succ;
+    ostringstream oss;
+    oss<<cmd_list[CMD_HONOR_EXC]<<";"<<succ<<";";
     if (succ == 0 ) {
-        hstr<<index<<iter->second.daily_exc_count_<<iter->second.all_exc_count_;
+        oss<<index<<";"<<iter->second.daily_exc_count_<<";"<<iter->second.all_exc_count_;
     }
-    nh_->sendString(e.fd_, hstr.str(), hstr.size());
+    string str = oss.str();
+    nh_->sendString(e.fd_, str);
 }
 
 void EventHandler::processLoadGears(EventCmd &e, vector<string> &check_cmd) {
@@ -806,18 +824,17 @@ void EventHandler::processLoadGears(EventCmd &e, vector<string> &check_cmd) {
     if (!safeLoadPvpGears(user, CMD_LOAD_GEARS, e.fd_)) {
         return;
     }
-    hstring hstr(";");
-    hstr<<cmd_list[CMD_LOAD_GEARS]<<0<<user->gear_infs_.size();
+
+    ostringstream oss;
+    oss<<cmd_list[CMD_LOAD_GEARS]<<";"<<0<<";"<<user->gear_infs_.size()<<";";
 
     for (map<long long, GearInf>::iterator iter = user->gear_infs_.begin(); iter != user->gear_infs_.end(); ++ iter) {
 
-        hstring htmp(",");
         GearInf & ginf = iter->second;
-        htmp<<ginf.id_<<ginf.mid_<<ginf.level_<<ginf.hero_id_;
-        hstr<<htmp;
-        htmp.clear();
+        oss<<ginf.id_<<","<<ginf.mid_<<","<<ginf.level_<<","<<ginf.hero_id_;
     }
-    nh_->sendString(e.fd_, hstr.str(), hstr.size());
+    string str = oss.str();
+    nh_->sendString(e.fd_, str);
 }
 
 void EventHandler::processUpgradeGear(EventCmd &e, vector<string> &check_cmd) {
@@ -857,12 +874,13 @@ void EventHandler::processUpgradeGear(EventCmd &e, vector<string> &check_cmd) {
             dh_->saveGear(user, ginf);
         }
     }
-    hstring hstr(";");
-    hstr<<cmd_list[CMD_UPGRADE_GEAR]<<succ;
+    ostringstream oss;
+    oss<<cmd_list[CMD_UPGRADE_GEAR]<<";"<<succ<<";";
     if (succ == 0) {
-        hstr<<gid<<iter->second.level_<<user->gold_<<user->diamond_;
+        oss<<gid<<";"<<iter->second.level_<<";"<<user->gold_<<";"<<user->diamond_;
     }
-    nh_->sendString(e.fd_, hstr.str(), hstr.size());
+    string str = oss.str();
+    nh_->sendString(e.fd_, str);
 }
 
 void EventHandler::processSetDefendTeam(EventCmd &e, vector <string> &check_cmd) {
@@ -890,9 +908,10 @@ void EventHandler::processSetDefendTeam(EventCmd &e, vector <string> &check_cmd)
         dh_->addUserPvpInfo(user);
     }
 
-    hstring  hstr(";");
-    hstr<<cmd_list[CMD_SET_DEFEND_TEAM]<<succ;
-    nh_->sendString(e.fd_, hstr.str(), hstr.size());
+    ostringstream oss;
+    oss<<cmd_list[CMD_SET_DEFEND_TEAM]<<";"<<succ;
+    string str = oss.str();
+    nh_->sendString(e.fd_, str);
 }
 
 

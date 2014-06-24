@@ -2324,6 +2324,9 @@ bool DataHandler::addPvpRank(User *user) {
 
 bool DataHandler::savePvpRank(int rankid, long long uid) {
     char sql[256];
+    if (rankid > 0 && rankid < (int) pvp_rank_uids_.size()) {
+        pvp_rank_uids_[rankid] = uid;
+    }
     sprintf(sql, "update pvp_rank_info set `uid`='%lld' where `rankid`='%d';", uid, rankid);
     int ret = execSql(sql);
     LOG4CXX_DEBUG(logger_, "save pvp_rank_info succ:"<<db_error_);

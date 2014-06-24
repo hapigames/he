@@ -735,26 +735,29 @@ string buildForceSEUResponse()
     return ost.str();
 }
 
-void buildLoadBuildingsResponse(hstring &hstr, User *user) {
+string buildLoadBuildingsResponse(User *user) {
     
-    hstr<<cmd_list[CMD_LOAD_BUILDINGS]<<0<<user->uid_<<user->pvp_team_id_<<user->build_infs_.size();
+    ostringstream oss;
+    
+    oss<<cmd_list[CMD_LOAD_BUILDINGS]<<";"<<0<<";"<<user->uid_<<";"<<user->pvp_team_id_<<";"<<user->build_infs_.size()<<";";
 
     for (map <long long, BuildInf>::iterator iter = user->build_infs_.begin(); iter != user->build_infs_.end(); iter++) {
-        hstring buildstr(",");
         const BuildInf &binf = iter->second;
 
-        buildstr<<binf.id_<<binf.mid_<<binf.level_<<binf.position_<<binf.gem_type_;
+        oss<<binf.id_<<","<<binf.mid_<<","<<binf.level_<<","<<binf.position_<<","<<binf.gem_type_<<";";
 
-        hstr<<buildstr;
-
-        buildstr.clear();
     }
-    hstr<<user->honor_<<user->gold_<<user->diamond_<<user->wood_<<user->stone_;
+    oss<<user->honor_<<";"<<user->gold_<<";"<<user->diamond_<<";"<<user->wood_<<";"<<user->stone_;
+
+    return oss.str();
 }
 
-void buildLoadBuildingsByIdResponse(hstring &hstr, User *user, int cmd_code) {
+string buildLoadBuildingsByIdResponse(User *user, int cmd_code, int bttype) {
+
+    ostringstream oss;
     
-    hstr<<cmd_list[cmd_code]<<0<<user->uid_;
+    //hstr<<cmd_list[cmd_code]<<0<<bttype<<user->uid_<<user->nick_name_;
+    oss<<cmd_list[cmd_code]<<";"<<0<<";"<<bttype<<";"<<user->uid_<<";"<<user->nick_name_<<";";
     bool had_team = false;
     long long pvp_hid = 0;
     if (user->pvp_team_id_ > 0) {
@@ -765,28 +768,32 @@ void buildLoadBuildingsByIdResponse(hstring &hstr, User *user, int cmd_code) {
 
             map <long long, Hero *>::iterator hiter = user->heroes_.find(team->hero_id_);
             if (hiter != user->heroes_.end()) {
-                hstr<<hiter->second->mid_<<hiter->second->star_<<hiter->second->level_;
+                //hstr<<hiter->second->mid_<<hiter->second->star_<<hiter->second->level_;
+                oss<<hiter->second->mid_<<";"<<hiter->second->star_<<";"<<hiter->second->level_<<";";
             }
             else {
-                hstr<<0<<0<<0;
+                oss<<0<<";"<<0<<";"<<0;
             }
 
             pvp_hid = team->hero_id_;
 
-            hstr<<team->soldier_id_.size();
+            oss<<team->soldier_id_.size()<<";";
+
             for (size_t i = 0; i < team->soldier_id_.size(); i++) {
 
-                hstring stmp(",");
+                //hstring stmp(",");
 
                 map <long long, Soldier *>::iterator siter = user->soldiers_.find(team->soldier_id_[i]);
                 if (siter != user->soldiers_.end()) {
-                    stmp<<siter->second->mid_<<siter->second->star_<<siter->second->level_;      
+                    //stmp<<siter->second->mid_<<siter->second->star_<<siter->second->level_;      
+                    oss<<siter->second->mid_<<","<<siter->second->star_<<","<<siter->second->level_<<";";      
                 }
                 else {
-                    stmp<<1<<1<<1;
+                    //stmp<<1<<1<<1;
+                    oss<<1<<","<<1<<","<<1<<";";
                 }
-                hstr<<stmp;
-                stmp.clear();
+                //hstr<<stmp;
+                //stmp.clear();
             }
 
             had_team = true;
@@ -794,8 +801,8 @@ void buildLoadBuildingsByIdResponse(hstring &hstr, User *user, int cmd_code) {
 
     }
     if (!had_team) {
-        hstr<<0<<0<<0;
-        hstr<<0;
+        oss<<0<<";"<<0<<";"<<0<<";";
+        oss<<0<<";";
     }
 
     int gnum = 0;
@@ -806,29 +813,34 @@ void buildLoadBuildingsByIdResponse(hstring &hstr, User *user, int cmd_code) {
             }
         }
     }
-    hstr<<gnum;
+    //hstr<<gnum;
+    oss<<gnum<<";";
+
     if (gnum > 0) {
         for (size_t i = 0; i < user->gear_infs_.size(); i++) {
             GearInf &ginf = user->gear_infs_[i];
             if (ginf.hero_id_ > 0 && ginf.hero_id_ == pvp_hid) {
                 
-                hstring htmp(",");
-                htmp<<ginf.mid_<<ginf.level_;
+                //hstring htmp(",");
+                //htmp<<ginf.mid_<<ginf.level_;
+                oss<<ginf.mid_<<","<<ginf.level_<<";";
 
-                hstr<<htmp;
-                htmp.clear();
+                //hstr<<htmp;
+                //htmp.clear();
             }
         }
     }
 
-    hstr<<user->build_infs_.size();
+    oss<<user->build_infs_.size()<<";";
 
     for (map <long long, BuildInf>::iterator iter = user->build_infs_.begin(); iter != user->build_infs_.end(); iter++) {
-        hstring buildstr(",");
+
+        //hstring buildstr(",");
         const BuildInf &binf = iter->second;
-        buildstr<<binf.id_<<binf.mid_<<binf.level_<<binf.position_<<binf.gem_type_;
-        hstr<<buildstr;
-        buildstr.clear();
+        //buildstr<<binf.id_<<binf.mid_<<binf.level_<<binf.position_<<binf.gem_type_;
+        oss<<binf.id_<<","<<binf.mid_<<","<<binf.level_<<","<<binf.position_<<","<<binf.gem_type_<<";";
+        //hstr<<buildstr;
+        //buildstr.clear();
     }
 
     int gold = (int) user->gold_ * game_config.rob_gold_percent_ / 100;
@@ -839,7 +851,11 @@ void buildLoadBuildingsByIdResponse(hstring &hstr, User *user, int cmd_code) {
     stone = max(stone, 1);
     //TODO 
     int honor = 0;
-    hstr<<honor<<gold<<0<<wood<<stone;
+    
+    oss<<";"<<honor<<";"<<gold<<";"<<0<<";"<<wood<<";"<<stone;
+
+    string str = oss.str();
+    return str;
 }
 
 

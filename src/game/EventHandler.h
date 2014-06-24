@@ -142,7 +142,7 @@ public:
 
     void processLoadbuildings(EventCmd &e, vector<string> &check_cmd) ;
     void processLoadBuildingsById(EventCmd &e, vector<string> &check_cmd) ;
-    void buildPvpRanksResponse(hstring &hstr, vector <int>& rankids, int cmd_code);
+    void buildPvpRanksResponse(ostringstream &oss, vector <int>& rankids, int cmd_code);
     void processLoadPvpRanks(EventCmd &e, vector<string> &check_cmd) ;
     void processLoadPvpTargets(EventCmd &e, vector<string> &check_cmd) ;
     void processLoadPvpLootTargets(EventCmd &e, vector <string> &check_cmd);

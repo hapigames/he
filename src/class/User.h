@@ -81,6 +81,7 @@ public:
     void loadBuildingsPositions(vector <int> &poses);
 
     void dateChange();
+    void clearAttack(time_t now);
     bool canAttack(time_t now);
     
     uid_type uid_;//0
